@@ -20,8 +20,7 @@ import rosdistro
 
 def test_get_os_package_name_derived_binary():
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(test_dir)))
-    index_path = os.path.join(workspace_root, 'tests', 'workflow_4', 'index.yaml')
+    index_path = os.path.join(test_dir, 'fake_rosdistro', 'index.yaml')
     index_url = f"file://{index_path}"
 
     index = rosdistro.get_index(index_url)
@@ -36,8 +35,7 @@ def test_get_os_package_name_derived_binary():
 
 def test_get_os_package_name_derived_source():
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(test_dir)))
-    index_path = os.path.join(workspace_root, 'tests', 'workflow_4', 'index.yaml')
+    index_path = os.path.join(test_dir, 'fake_rosdistro', 'index.yaml')
     index_url = f"file://{index_path}"
 
     index = rosdistro.get_index(index_url)

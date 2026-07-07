@@ -1,0 +1,17 @@
+%YAML 1.1
+---
+release_platforms:
+  ubuntu:
+    - bionic
+extends:
+  - distro_name: base
+    extension_method: binary_import
+repositories:
+  new_package:
+    release:
+      tags:
+        release: release/melodic/{package}/{version}
+      url: https://github.com/example-release/new_package.git
+      version: 1.0.0
+type: distribution
+version: 3
