@@ -59,7 +59,7 @@ def get_rosdistro_info(dist, build_file):
     for pkg_name in pkg_names:
         # package name
         ros_pkg = RosPackage(pkg_name)
-        ros_pkg.debian_name = get_os_package_name(dist.name, pkg_name)
+        ros_pkg.debian_name = get_os_package_name(dist.name, pkg_name, dist)
 
         pkg = dist.release_packages[pkg_name]
         repo = dist.repositories[pkg.repository_name].release_repository

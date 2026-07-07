@@ -982,7 +982,7 @@ def partition_packages(
     distribution = get_cached_distribution(index, rosdistro_name, cache=dist_cache)
     pkg_names = filter_buildfile_packages_recursively(all_pkg_names, build_file, distribution)
     for pkg_name in sorted(pkg_names):
-        debian_pkg_name = get_os_package_name(rosdistro_name, pkg_name)
+        debian_pkg_name = get_os_package_name(rosdistro_name, pkg_name, dist_file)
         if debian_pkg_name in repo_index:
             binary_packages.add(pkg_name)
 

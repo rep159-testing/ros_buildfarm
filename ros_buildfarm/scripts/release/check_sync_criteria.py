@@ -75,7 +75,7 @@ def check_sync_criteria(
     all_pkg_names = dist_file.release_packages.keys()
     pkg_names = build_file.filter_packages(all_pkg_names)
     for pkg_name in sorted(pkg_names):
-        debian_pkg_name = get_os_package_name(rosdistro_name, pkg_name)
+        debian_pkg_name = get_os_package_name(rosdistro_name, pkg_name, dist_file)
         binary_packages[pkg_name] = debian_pkg_name in repo_index
 
     # check that all elements from whitelist are present

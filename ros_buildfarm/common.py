@@ -200,9 +200,17 @@ def get_os_package_name_prefix(rosdistro_name):
     return 'ros-%s-' % rosdistro_name
 
 
-def get_os_package_name(rosdistro_name, ros_package_name):
+def get_os_package_name(rosdistro_name, ros_package_name, dist_file=None):
+    prefix_distro = rosdistro_name
+    if dist_file and ros_package_name in dist_file.release_packages:
+        pkg = dist_file.release_packages[ros_package_name]
+        if pkg.repository_name in dist_file.repositories:
+            repo = dist_file.repositories[pkg.repository_name]
+            if repo.release_repository and hasattr(repo.release_repository, 'origin_distro') and repo.release_repository.origin_distro:
+                if hasattr(repo.release_repository, 'extension_method') and repo.release_repository.extension_method == 'binary_import':
+                    prefix_distro = repo.release_repository.origin_distro
     return '%s%s' % \
-        (get_os_package_name_prefix(rosdistro_name),
+        (get_os_package_name_prefix(prefix_distro),
          ros_package_name.replace('_', '-'))
 
 
