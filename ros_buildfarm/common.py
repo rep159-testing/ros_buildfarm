@@ -206,9 +206,11 @@ def get_os_package_name(rosdistro_name, ros_package_name, dist_file=None):
         pkg = dist_file.release_packages[ros_package_name]
         if pkg.repository_name in dist_file.repositories:
             repo = dist_file.repositories[pkg.repository_name]
-            if repo.release_repository and hasattr(repo.release_repository, 'origin_distro') and repo.release_repository.origin_distro:
-                if hasattr(repo.release_repository, 'extension_method') and repo.release_repository.extension_method == 'binary_import':
-                    prefix_distro = repo.release_repository.origin_distro
+            rel_repo = repo.release_repository
+            if rel_repo and hasattr(rel_repo, 'origin_distro') and rel_repo.origin_distro:
+                if (hasattr(rel_repo, 'extension_method') and
+                        rel_repo.extension_method == 'binary_import'):
+                    prefix_distro = rel_repo.origin_distro
     return '%s%s' % \
         (get_os_package_name_prefix(prefix_distro),
          ros_package_name.replace('_', '-'))
