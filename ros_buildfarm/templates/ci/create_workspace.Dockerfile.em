@@ -74,6 +74,14 @@ RUN echo "@today_str"
     dependency_versions=dependency_versions,
 ))@
 
+# REP-2015 test: shadow the apt rosdistro module with the fork that parses
+# distribution file version 3 and resolves `extends`. pip installs under
+# /usr/local, which precedes /usr/lib/python3/dist-packages on sys.path, so
+# both rosdep and create_workspace.py import the fork.
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
+RUN pip3 install --break-system-packages --no-deps \
+    git+https://github.com/KmoM88/rosdistro@@436f5429fc1e
+
 # needed for 'vcs custom --git --args merge' invocation
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends sudo wget
 RUN sudo -H -u buildfarm -- git config --global user.email "jenkins@@ros.invalid" && sudo -H -u buildfarm -- git config --global user.name "Jenkins ROS"
