@@ -29,8 +29,8 @@ def test_get_os_package_name_derived_binary():
     # turtlesim is from base via binary_import -> should resolve to ros-base-turtlesim
     assert get_os_package_name('derived_binary', 'turtlesim', dist_file) == 'ros-base-turtlesim'
 
-    # new_package is defined in derived_binary -> should resolve to ros-derived_binary-new-package
-    assert get_os_package_name('derived_binary', 'new_package', dist_file) == 'ros-derived_binary-new-package'
+    # new_package is defined in derived_binary -> should resolve to ros-derived-binary-new-package
+    assert get_os_package_name('derived_binary', 'new_package', dist_file) == 'ros-derived-binary-new-package'
 
 
 def test_get_os_package_name_derived_source():
@@ -41,5 +41,5 @@ def test_get_os_package_name_derived_source():
     index = rosdistro.get_index(index_url)
     dist_file = rosdistro.get_distribution_file(index, 'derived_source')
 
-    # turtlesim is from base via source_rebuild -> should resolve to ros-derived_source-turtlesim
-    assert get_os_package_name('derived_source', 'turtlesim', dist_file) == 'ros-derived_source-turtlesim'
+    # turtlesim is from base via source_rebuild -> should resolve to ros-derived-source-turtlesim
+    assert get_os_package_name('derived_source', 'turtlesim', dist_file) == 'ros-derived-source-turtlesim'
