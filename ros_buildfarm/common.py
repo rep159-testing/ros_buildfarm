@@ -197,7 +197,7 @@ def get_ci_view_name(rosdistro_name):
 
 
 def get_os_package_name_prefix(rosdistro_name):
-    return 'ros-%s-' % rosdistro_name
+    return 'ros-%s-' % rosdistro_name.replace('_', '-')
 
 
 def get_os_package_name(rosdistro_name, ros_package_name, dist_file=None):
