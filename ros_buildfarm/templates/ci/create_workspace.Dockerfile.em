@@ -74,13 +74,18 @@ RUN echo "@today_str"
     dependency_versions=dependency_versions,
 ))@
 
-# REP-2015 test: shadow the apt rosdistro module with the fork that parses
-# distribution file version 3 and resolves `extends`. pip installs under
-# /usr/local, which precedes /usr/lib/python3/dist-packages on sys.path, so
-# both rosdep and create_workspace.py import the fork.
+# REP-159 test: shadow the apt rosdistro and rosdep modules with the forks.
+# The rosdistro fork parses distribution file version 3, resolves `extends`
+# (parents from extends[].index_url, failing loudly when one cannot load);
+# the rosdep fork maps a binary_import parent's packages to the parent's
+# binaries (ros-<parent>-*). pip installs under /usr/local, which precedes
+# /usr/lib/python3/dist-packages on sys.path, so rosdep update,
+# create_workspace.py and generate_install_lists.py, which all run in this
+# image, import the forks.
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
 RUN pip3 install --break-system-packages --no-deps \
-    git+https://github.com/KmoM88/rosdistro@@436f5429fc1e
+    git+https://github.com/rep159-testing/rosdistro@@46a75800b346 \
+    git+https://github.com/rep159-testing/rosdep@@3d52dadcbe13
 
 # needed for 'vcs custom --git --args merge' invocation
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends sudo wget
