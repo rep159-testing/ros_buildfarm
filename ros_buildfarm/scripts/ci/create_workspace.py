@@ -30,7 +30,91 @@ from rosdistro import get_cached_distribution
 from rosdistro import get_index
 from rosdistro import get_index_url
 from rosdistro.dependency_walker import DependencyWalker
+from rosdistro.dependency_walker import SourceDependencyWalker
 import yaml
+
+
+DEPENDENCY_TYPES = [
+    'buildtool', 'buildtool_export', 'build', 'build_export', 'run', 'test']
+
+
+# Walks released and source-only packages of one distribution alike. A
+# package with a release entry is read from its released package.xml, as
+# DependencyWalker does; one with only a source entry (which REP 159
+# source_rebuild allows, in the child and in its parents) is read from the
+# source part of the distribution cache.
+class ReleaseAndSourceDependencyWalker(DependencyWalker):
+
+    def __init__(self, distribution_instance):  # noqa: D107
+        super().__init__(distribution_instance)
+        self._source_walker = SourceDependencyWalker(distribution_instance)
+
+    def _get_package_names(self):
+        return set(self._distribution_instance.release_packages.keys()) | \
+            set(self._distribution_instance.source_packages.keys())
+
+    def _get_package(self, pkg_name):
+        if pkg_name in self._distribution_instance.release_packages:
+            return super()._get_package(pkg_name)
+        return self._source_walker._get_package(pkg_name)
+
+
+def _source_repository_data(source_repository):
+    repo_data = {
+        'type': source_repository.type,
+        'url': source_repository.url,
+    }
+    if source_repository.version is not None:
+        repo_data['version'] = source_repository.version
+    return repo_data
+
+
+def get_repositories_data(
+    dist, repository_names, package_names, package_dependencies
+):
+    """
+    Return the repositories to check out for a CI workspace.
+
+    Repositories named directly, and source-only packages, use the source
+    entry and are keyed by repository name. Released packages use the
+    release repository at the release tag and are keyed by package name.
+    """
+    data = {}
+    for repo_name in repository_names or ():
+        data[repo_name] = _source_repository_data(
+            dist.repositories[repo_name].source_repository)
+
+    package_names = list(package_names or ())
+    if package_dependencies and package_names:
+        walker = ReleaseAndSourceDependencyWalker(dist)
+        additional_package_names = set()
+        for pkg_name in package_names:
+            additional_package_names |= walker.get_recursive_depends(
+                pkg_name, DEPENDENCY_TYPES, ros_packages_only=True)
+        additional_package_names.difference_update(package_names)
+        package_names.extend(sorted(additional_package_names))
+
+    for pkg_name in package_names:
+        if pkg_name in dist.release_packages:
+            pkg = dist.release_packages[pkg_name]
+            rel_repo = dist.repositories[pkg.repository_name].release_repository
+            data[pkg_name] = {
+                'type': 'git',
+                'url': rel_repo.url,
+                'version': rel_repo.tags['release'].format_map({
+                    'package': pkg_name,
+                    'version': rel_repo.version,
+                }),
+            }
+        elif pkg_name in dist.source_packages:
+            repo_name = dist.source_packages[pkg_name].repository_name
+            data[repo_name] = _source_repository_data(
+                dist.repositories[repo_name].source_repository)
+        else:
+            raise KeyError(
+                "Package '%s' has neither a release nor a source entry" %
+                pkg_name)
+    return data
 
 
 def main(argv=sys.argv[1:]):
@@ -57,40 +141,9 @@ def main(argv=sys.argv[1:]):
         with Scope('SUBSECTION', 'get repository information from rosdistro'):
             index = get_index(get_index_url())
             dist = get_cached_distribution(index, args.rosdistro_name)
-            data = {}
-            for repo_name in args.repository_names or ():
-                repo = dist.repositories[repo_name]
-                src_repo = repo.source_repository
-                repo_data = {
-                    'type': src_repo.type,
-                    'url': src_repo.url,
-                }
-                if src_repo.version is not None:
-                    repo_data['version'] = src_repo.version
-                data[repo_name] = repo_data
-            if args.package_dependencies and args.package_names:
-                walker = DependencyWalker(dist)
-                additional_package_names = set()
-                for pkg_name in args.package_names:
-                    additional_package_names |= walker.get_recursive_depends(
-                        pkg_name,
-                        ['buildtool', 'buildtool_export', 'build', 'build_export', 'run', 'test'],
-                        ros_packages_only=True)
-                additional_package_names.difference_update(args.package_names)
-                args.package_names.extend(additional_package_names)
-            for pkg_name in args.package_names or ():
-                pkg = dist.release_packages[pkg_name]
-                repo = dist.repositories[pkg.repository_name]
-                rel_repo = repo.release_repository
-                repo_data = {
-                    'type': 'git',
-                    'url': rel_repo.url,
-                    'version': rel_repo.tags['release'].format_map({
-                        'package': pkg_name,
-                        'version': rel_repo.version,
-                    }),
-                }
-                data[pkg_name] = repo_data
+            data = get_repositories_data(
+                dist, args.repository_names, args.package_names,
+                args.package_dependencies)
             repos_file = os.path.join(args.workspace_root, 'repositories-from-rosdistro.repos')
             with open(repos_file, 'w') as h:
                 h.write(yaml.safe_dump({'repositories': data}, default_flow_style=False))
