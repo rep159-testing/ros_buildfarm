@@ -206,6 +206,42 @@ def get_os_package_name(rosdistro_name, ros_package_name):
          ros_package_name.replace('_', '-'))
 
 
+BINARY_IMPORT_DISTROS_ENV = 'ROS_BUILDFARM_BINARY_IMPORT_DISTROS'
+
+
+def get_binary_import_distros(dist_file):
+    """
+    Return the distributions a distribution extends with binary_import.
+
+    REP 159: their packages are installed as the parent's own binaries under
+    /opt/ros/<parent>, so a build must source those prefixes as underlays.
+    A distribution file without `extends` (format 2, or a rosdistro library
+    without REP 159 support) has none.
+    """
+    return [
+        ext['distro_name']
+        for ext in getattr(dist_file, 'extends', None) or []
+        if ext.get('extension_method') == 'binary_import']
+
+
+def get_default_parent_result_spaces(rosdistro_name, environ=None):
+    """
+    Return the prefixes to source before building for a rosdistro.
+
+    The binary_import parents listed, colon separated, in
+    ROS_BUILDFARM_BINARY_IMPORT_DISTROS come first, then
+    /opt/ros/<rosdistro_name>. The variable is set when the job is
+    generated: the build images have no rosdistro able to read REP 159
+    distribution files at run time.
+    """
+    if environ is None:
+        environ = os.environ
+    parents = [
+        name for name in environ.get(BINARY_IMPORT_DISTROS_ENV, '').split(':')
+        if name]
+    return ['/opt/ros/%s' % name for name in parents + [rosdistro_name]]
+
+
 def get_devel_view_name(rosdistro_name, source_build_name, pull_request=False):
     name = '%s%s' % (
         rosdistro_name[0].upper(),

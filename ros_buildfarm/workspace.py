@@ -16,6 +16,8 @@ import os
 import shutil
 import subprocess
 
+from ros_buildfarm.common import get_default_parent_result_spaces
+
 
 def ensure_workspace_exists(workspace_root):
     # ensure that workspace exists
@@ -140,7 +142,7 @@ def call_build_tool(
 
     # prepend setup files if available
     if parent_result_spaces is None:
-        parent_result_spaces = ['/opt/ros/%s' % rosdistro_name]
+        parent_result_spaces = get_default_parent_result_spaces(rosdistro_name)
     for parent_result_space in reversed(parent_result_spaces):
         setup_file = os.path.join(parent_result_space, 'setup.sh')
         if os.path.exists(setup_file):
