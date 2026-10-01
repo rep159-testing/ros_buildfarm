@@ -15,7 +15,9 @@
 import pytest
 from ros_buildfarm.scripts.ci.create_workspace import get_repositories_data
 from rosdistro import get_cached_distribution
+from rosdistro import get_index
 from rosdistro.distribution_cache import DistributionCache
+import yaml
 
 # upstream_a <- upstream_b <- upstream_c <- downstream_src_a, as in the
 # REP-159 harness; libxml2 and libyaml are rosdep keys, not packages.
@@ -108,3 +110,69 @@ def test_repository_names_read_the_source_entry():
     data = get_repositories_data(
         _distribution(SOURCE_CHAIN), ['upstream_a'], [], False)
     assert data == {'upstream_a': _source_entry('upstream_a')}
+
+
+def _extended_distribution(tmp_path, extension_method):
+    """
+    Load 'child' through a REP 159 index, as a CI job does.
+
+    'child' holds downstream_a, on upstream_c, and extends 'parent', the
+    upstream chain, with the given extension_method.
+    """
+    parent_chain = {
+        name: deps for name, deps in SOURCE_CHAIN.items()
+        if name.startswith('upstream_')}
+    chains = {
+        'parent': (parent_chain, []),
+        'child': ({'downstream_a': ['upstream_c', 'libyaml']}, [
+            {'distro_name': 'parent', 'extension_method': extension_method}]),
+    }
+    index = {'type': 'index', 'version': 4, 'distributions': {}}
+    for distro, (chain, extends) in chains.items():
+        dist_data = {
+            'type': 'distribution',
+            'version': 3,
+            'release_platforms': {'ubuntu': ['resolute']},
+            'repositories': {
+                name: {'source': _source_entry(name)} for name in chain}}
+        if extends:
+            dist_data['extends'] = extends
+        cache_data = {
+            'type': 'cache',
+            'version': 2,
+            'name': distro,
+            'distribution_file': [dist_data],
+            'release_package_xmls': {},
+            'source_repo_package_xmls': {
+                name: {'_ref': '0' * 40, name: ['.', _package_xml(name, deps)]}
+                for name, deps in chain.items()}}
+        (tmp_path / distro).mkdir()
+        (tmp_path / distro / 'distribution.yaml').write_text(
+            yaml.safe_dump(dist_data))
+        (tmp_path / ('%s-cache.yaml' % distro)).write_text(
+            yaml.safe_dump(cache_data))
+        index['distributions'][distro] = {
+            'distribution': ['%s/distribution.yaml' % distro],
+            'distribution_cache': '%s-cache.yaml' % distro,
+            'distribution_status': 'active',
+            'distribution_type': 'ros2',
+            'python_version': 3}
+    (tmp_path / 'index-v4.yaml').write_text(yaml.safe_dump(index))
+    return get_cached_distribution(
+        get_index('file://%s' % (tmp_path / 'index-v4.yaml')), 'child')
+
+
+def test_walk_stops_at_binary_import_parent_packages(tmp_path):
+    # The parent's packages come as its binaries: checking them out would
+    # override them in the child, which binary_import forbids.
+    dist = _extended_distribution(tmp_path, 'binary_import')
+    data = get_repositories_data(dist, [], ['downstream_a'], True)
+    assert data == {'downstream_a': _source_entry('downstream_a')}
+
+
+def test_walk_rebuilds_source_rebuild_parent_packages(tmp_path):
+    dist = _extended_distribution(tmp_path, 'source_rebuild')
+    data = get_repositories_data(dist, [], ['downstream_a'], True)
+    assert data == {
+        name: _source_entry(name) for name in
+        ('downstream_a', 'upstream_a', 'upstream_b', 'upstream_c')}
