@@ -42,7 +42,9 @@ DEPENDENCY_TYPES = [
 # package with a release entry is read from its released package.xml, as
 # DependencyWalker does; one with only a source entry (which REP 159
 # source_rebuild allows, in the child and in its parents) is read from the
-# source part of the distribution cache.
+# source part of the distribution cache. Packages of a binary_import parent
+# are left out, as system dependencies are: they come as the parent's
+# binaries, and checking them out would override them in the child.
 class ReleaseAndSourceDependencyWalker(DependencyWalker):
 
     def __init__(self, distribution_instance):  # noqa: D107
@@ -50,13 +52,29 @@ class ReleaseAndSourceDependencyWalker(DependencyWalker):
         self._source_walker = SourceDependencyWalker(distribution_instance)
 
     def _get_package_names(self):
-        return set(self._distribution_instance.release_packages.keys()) | \
-            set(self._distribution_instance.source_packages.keys())
+        dist = self._distribution_instance
+        names = set(dist.release_packages.keys()) | \
+            set(dist.source_packages.keys())
+        return {
+            name for name in names
+            if not _is_binary_import(dist, _repository_name(dist, name))}
 
     def _get_package(self, pkg_name):
         if pkg_name in self._distribution_instance.release_packages:
             return super()._get_package(pkg_name)
         return self._source_walker._get_package(pkg_name)
+
+
+def _repository_name(dist, pkg_name):
+    if pkg_name in dist.release_packages:
+        return dist.release_packages[pkg_name].repository_name
+    return dist.source_packages[pkg_name].repository_name
+
+
+def _is_binary_import(dist, repo_name):
+    repo = dist.repositories[repo_name]
+    return getattr(repo, 'extension_method', None) == 'binary_import' and \
+        getattr(repo, 'origin_distro', dist.name) != dist.name
 
 
 def _source_repository_data(source_repository):
