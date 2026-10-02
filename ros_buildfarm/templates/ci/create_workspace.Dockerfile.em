@@ -74,6 +74,19 @@ RUN echo "@today_str"
     dependency_versions=dependency_versions,
 ))@
 
+# REP-159 test: shadow the apt rosdistro and rosdep modules with KmoM88's
+# REP-2015 forks. The rosdistro fork parses distribution file version 3 and
+# resolves `extends`; the rosdep fork names a binary_import parent's
+# binaries. pip installs under /usr/local, which precedes
+# /usr/lib/python3/dist-packages on sys.path, so rosdep update,
+# create_workspace.py and generate_install_lists.py, which all run in this
+# image, import the forks. Full SHAs: the rosdistro commit is no longer on a
+# branch, and pip cannot fetch an unreachable commit by a short SHA.
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
+RUN pip3 install --break-system-packages --no-deps \
+    git+https://github.com/KmoM88/rosdistro@@436f5429fc1e1a70144de9c809823321df4a3ec2 \
+    git+https://github.com/KmoM88/rosdep@@3d52dadcbe13cccc6d9292db27569641c88dcdbd
+
 # needed for 'vcs custom --git --args merge' invocation
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends sudo wget
 RUN sudo -H -u buildfarm -- git config --global user.email "jenkins@@ros.invalid" && sudo -H -u buildfarm -- git config --global user.name "Jenkins ROS"
