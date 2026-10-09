@@ -52,6 +52,14 @@ RUN echo "@today_str"
 ))@
 
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y debhelper dpkg dpkg-dev git git-buildpackage python3-catkin-pkg-modules python3-rosdistro-modules python3-yaml
+
+# REP-159 test: shadow the apt rosdistro module with KmoM88's REP-2015 fork,
+# which parses distribution file version 3. pip installs under /usr/local,
+# which precedes /usr/lib/python3/dist-packages on sys.path. Full SHA: the
+# commit is no longer on a branch, and pip cannot fetch it by a short SHA.
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends git python3-pip
+RUN pip3 install --break-system-packages --no-deps \
+    git+https://github.com/KmoM88/rosdistro@@436f5429fc1e1a70144de9c809823321df4a3ec2
 @[if os_name == 'ubuntu' and os_code_name == 'yakkety']@
 @# git-buildpackage in Yakkety has a bug resulting in using the current time for
 @# the to be archived files resulting in non-deterministic checksums for the tarball
