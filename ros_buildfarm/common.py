@@ -206,6 +206,101 @@ def get_os_package_name(rosdistro_name, ros_package_name):
          ros_package_name.replace('_', '-'))
 
 
+PARENT_RESULT_SPACES_ENV = 'ROS_BUILDFARM_PARENT_RESULT_SPACES'
+BINARY_IMPORT_DISTROS_ENV = 'ROS_BUILDFARM_BINARY_IMPORT_DISTROS'
+
+
+def get_distribution_install_prefix(dist_file, pkg_name=None):
+    """
+    Return the installation prefix for a distribution or package.
+
+    Uses get_install_prefix() if provided by REP 159 rosdistro dist_file,
+    otherwise falls back to /opt/ros/<distro_name>.
+    """
+    if hasattr(dist_file, 'get_install_prefix'):
+        return dist_file.get_install_prefix(pkg_name)
+    clean_distro = getattr(dist_file, 'name', '').replace('_', '-')
+    return '/opt/ros/%s' % clean_distro if clean_distro else '/usr'
+
+
+def get_binary_import_underlays(dist_file, index=None):
+    """
+    Return the installation prefixes of binary_import parents for dist_file.
+
+    If parent distributions define custom install_rule/prefix in the dist file
+    or within the extends block, those prefixes are resolved.
+    """
+    underlays = []
+    extends = getattr(dist_file, 'extends', None) or []
+    for ext in extends:
+        if ext.get('extension_method') == 'binary_import':
+            parent_distro = ext['distro_name']
+            parent_prefix = None
+            if 'install_rule' in ext:
+                rule = ext['install_rule']
+                if isinstance(rule, str):
+                    parent_prefix = rule.replace('{distro}', parent_distro).replace('{DISTRO}', parent_distro)
+                elif isinstance(rule, dict) and 'search' in rule and 'replace' in rule:
+                    import re
+                    clean_parent = parent_distro.replace('_', '-')
+                    parent_prefix = re.sub(
+                        rule['search'],
+                        rule['replace'].replace('{distro}', clean_parent).replace('{DISTRO}', clean_parent),
+                        clean_parent)
+            if not parent_prefix and index and hasattr(index, 'distributions') and parent_distro in index.distributions:
+                try:
+                    from rosdistro import get_distribution_file
+                    p_dist_file = get_distribution_file(index, parent_distro)
+                    if hasattr(p_dist_file, 'get_install_prefix'):
+                        parent_prefix = p_dist_file.get_install_prefix()
+                except Exception:
+                    pass
+            if not parent_prefix:
+                parent_prefix = '/opt/ros/%s' % parent_distro
+            if parent_prefix not in underlays:
+                underlays.append(parent_prefix)
+    return underlays
+
+
+def get_default_parent_result_spaces(rosdistro_name, environ=None, dist_file=None):
+    """
+    Return the prefixes to source before building for a rosdistro.
+
+    Checks:
+    1. ROS_BUILDFARM_PARENT_RESULT_SPACES env var (colon-separated full paths).
+    2. ROS_BUILDFARM_BINARY_IMPORT_DISTROS env var (legacy colon-separated distro names).
+    3. dist_file binary_import parents and install_rule, if dist_file provided.
+    4. Default fallback: /opt/ros/<rosdistro_name>.
+    """
+    if environ is None:
+        environ = os.environ
+
+    explicit_spaces = [
+        p for p in environ.get(PARENT_RESULT_SPACES_ENV, '').split(':')
+        if p
+    ]
+    if explicit_spaces:
+        return explicit_spaces
+
+    target_prefix = '/opt/ros/%s' % rosdistro_name
+    if dist_file and hasattr(dist_file, 'get_install_prefix'):
+        target_prefix = dist_file.get_install_prefix()
+
+    legacy_parents = [
+        name for name in environ.get(BINARY_IMPORT_DISTROS_ENV, '').split(':')
+        if name
+    ]
+    if legacy_parents:
+        return ['/opt/ros/%s' % name for name in legacy_parents] + [target_prefix]
+
+    if dist_file:
+        parent_underlays = get_binary_import_underlays(dist_file)
+        if parent_underlays:
+            return parent_underlays + [target_prefix]
+
+    return [target_prefix]
+
+
 def get_devel_view_name(rosdistro_name, source_build_name, pull_request=False):
     name = '%s%s' % (
         rosdistro_name[0].upper(),
