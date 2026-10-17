@@ -17,8 +17,6 @@ from __future__ import print_function
 from collections import OrderedDict
 import sys
 
-from ros_buildfarm.common import BINARY_IMPORT_DISTROS_ENV
-from ros_buildfarm.common import get_binary_import_distros
 from ros_buildfarm.common import get_ci_job_name
 from ros_buildfarm.common import get_ci_view_name
 from ros_buildfarm.common import get_default_node_label
@@ -34,7 +32,6 @@ from ros_buildfarm.config import get_index as get_config_index
 from ros_buildfarm.git import get_repository
 from ros_buildfarm.jenkins import JenkinsProxy
 from ros_buildfarm.templates import expand_template
-from rosdistro import get_distribution_file
 from rosdistro import get_index
 
 
@@ -262,12 +259,27 @@ def _get_ci_job_config(
             .get('distribution_type', 'ros1')
         assert distribution_type in ('ros1', 'ros2')
         # REP 159: packages of binary_import parents are installed under
-        # /opt/ros/<parent>; tell the build containers to source them.
-        binary_import_distros = get_binary_import_distros(
-            get_distribution_file(index, rosdistro_name))
-        if binary_import_distros:
-            build_environment_variables.append('%s=%s' % (
-                BINARY_IMPORT_DISTROS_ENV, ':'.join(binary_import_distros)))
+        # custom prefixes (or /opt/ros/<parent>); tell the build containers to source them.
+        try:
+            from ros_buildfarm.common import BINARY_IMPORT_DISTROS_ENV
+            from ros_buildfarm.common import get_binary_import_underlays
+            from ros_buildfarm.common import PARENT_RESULT_SPACES_ENV
+            from rosdistro import get_distribution_file
+            dist_file = get_distribution_file(index, rosdistro_name)
+            underlays = get_binary_import_underlays(dist_file, index=index)
+            if underlays:
+                build_environment_variables.append('%s=%s' % (
+                    PARENT_RESULT_SPACES_ENV, ':'.join(underlays)))
+                parents = [
+                    ext['distro_name']
+                    for ext in getattr(dist_file, 'extends', None) or []
+                    if ext.get('extension_method') == 'binary_import'
+                ]
+                if parents:
+                    build_environment_variables.append('%s=%s' % (
+                        BINARY_IMPORT_DISTROS_ENV, ':'.join(parents)))
+        except Exception:
+            pass
     else:
         distribution_type = 'global'
     ros_version = 1 if distribution_type == 'ros1' else 2
