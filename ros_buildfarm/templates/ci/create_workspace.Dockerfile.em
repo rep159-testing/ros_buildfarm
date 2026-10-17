@@ -84,7 +84,7 @@ RUN echo "@today_str"
 # image, import the forks.
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
 RUN pip3 install --break-system-packages --no-deps \
-    git+https://github.com/rep159-testing/rosdistro@@46a75800b346 \
+    git+https://github.com/rep159-testing/rosdistro@@feature/rep159-install-rule \
     git+https://github.com/rep159-testing/rosdep@@3d52dadcbe13
 
 # needed for 'vcs custom --git --args merge' invocation
