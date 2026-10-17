@@ -196,14 +196,31 @@ def get_ci_view_name(rosdistro_name):
     return view_name
 
 
-def get_os_package_name_prefix(rosdistro_name):
-    return 'ros-%s-' % rosdistro_name
+def get_os_package_name_prefix(rosdistro_name, dist_file=None):
+    clean_distro = rosdistro_name.replace('_', '-') if rosdistro_name else ''
+    if dist_file and hasattr(dist_file, 'binary_rule') and dist_file.binary_rule:
+        rule = dist_file.binary_rule
+        if isinstance(rule, dict) and rule.get('search') == '^':
+            prefix = rule.get('replace', '').replace('{distro}', clean_distro).replace('{DISTRO}', clean_distro)
+            return prefix.replace('_', '-')
+    return 'ros-%s-' % clean_distro
 
 
-def get_os_package_name(rosdistro_name, ros_package_name):
+def get_os_package_name(rosdistro_name, ros_package_name, dist_file=None):
+    """
+    Return the OS package name for a ROS package.
+
+    If dist_file is provided, delegates to dist_file.get_binary_package_name()
+    to support declarative binary_rule (regex rewriting, vendor prefixes,
+    exact package overrides). Otherwise falls back to 'ros-<distro>-<pkg>'.
+    """
+    if dist_file and hasattr(dist_file, 'get_binary_package_name'):
+        return dist_file.get_binary_package_name(ros_package_name)
+    clean_distro = rosdistro_name.replace('_', '-') if rosdistro_name else ''
+    clean_pkg = ros_package_name.replace('_', '-')
     return '%s%s' % \
-        (get_os_package_name_prefix(rosdistro_name),
-         ros_package_name.replace('_', '-'))
+        (get_os_package_name_prefix(clean_distro, dist_file=dist_file),
+         clean_pkg)
 
 
 def get_devel_view_name(rosdistro_name, source_build_name, pull_request=False):
