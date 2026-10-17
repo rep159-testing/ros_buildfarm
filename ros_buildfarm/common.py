@@ -210,6 +210,17 @@ PARENT_RESULT_SPACES_ENV = 'ROS_BUILDFARM_PARENT_RESULT_SPACES'
 BINARY_IMPORT_DISTROS_ENV = 'ROS_BUILDFARM_BINARY_IMPORT_DISTROS'
 
 
+def get_binary_import_distros(dist_file):
+    """
+    Return the distributions a distribution extends with binary_import.
+    """
+    return [
+        ext['distro_name']
+        for ext in getattr(dist_file, 'extends', None) or []
+        if ext.get('extension_method') == 'binary_import'
+    ]
+
+
 def get_distribution_install_prefix(dist_file, pkg_name=None):
     """
     Return the installation prefix for a distribution or package.
