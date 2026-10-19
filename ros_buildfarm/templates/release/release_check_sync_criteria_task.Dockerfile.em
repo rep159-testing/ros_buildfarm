@@ -1,6 +1,6 @@
 # generated from @template_name
 
-@{task_os_code_name = 'focal'}@
+@{task_os_code_name = os_code_name if os_name == 'ubuntu' else 'focal'}@
 FROM ubuntu:@task_os_code_name
 
 VOLUME ["/var/cache/apt/archives"]
@@ -40,7 +40,9 @@ RUN echo "@today_str"
     os_code_name=task_os_code_name,
 ))@
 
-RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y python3-rosdistro-modules python3-yaml
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y git python3-pip python3-rosdistro-modules python3-yaml
+RUN pip3 install --break-system-packages --no-deps \
+    git+https://github.com/rep159-testing/rosdistro@@feature/rep159-binary-naming-regex
 
 USER buildfarm
 ENTRYPOINT ["sh", "-c"]
