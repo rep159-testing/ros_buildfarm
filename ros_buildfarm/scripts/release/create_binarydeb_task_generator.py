@@ -113,6 +113,7 @@ def main(argv=sys.argv[1:]):
 
         'rosdistro_name': args.rosdistro_name,
         'package_name': args.package_name,
+        'debian_package_name': debian_package_name,
         'binarypkg_dir': args.binarypkg_dir,
         'docker_base_image_override': args.docker_base_image_override,
     }

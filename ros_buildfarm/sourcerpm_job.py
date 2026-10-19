@@ -19,7 +19,8 @@ from ros_buildfarm.common import get_os_package_name
 
 
 def _get_source_tag(
-        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name):
+        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name,
+        dist_file=None):
     assert os_name in ['fedora', 'rhel']
     # Both Fedora and RHEL use the integer release number as the code name
     os_version = int(os_code_name)
@@ -28,9 +29,9 @@ def _get_source_tag(
         (os_name == 'rhel' and os_version >= 10)
     ):
         return 'dynrpm/%s-%s' % (
-            get_os_package_name(rosdistro_name, pkg_name), pkg_version)
+            get_os_package_name(rosdistro_name, pkg_name, dist_file=dist_file), pkg_version)
     return 'rpm/%s-%s_%s' % (
-        get_os_package_name(rosdistro_name, pkg_name),
+        get_os_package_name(rosdistro_name, pkg_name, dist_file=dist_file),
         pkg_version, os_code_name)
 
 
@@ -52,8 +53,10 @@ def build_sourcerpm(
 
     pkg_version = repo.release_repository.version
     tag = _get_source_tag(
-        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name)
-    os_pkg_name = get_os_package_name(rosdistro_name, pkg_name)
+        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name,
+        dist_file=dist_file)
+    os_pkg_name = get_os_package_name(
+        rosdistro_name, pkg_name, dist_file=dist_file)
     release_repository_url = repo.release_repository.url
 
     clone_cmd = [
