@@ -526,7 +526,8 @@ def configure_release_job(
         config, build_file, os_name, os_code_name,
         pkg_name, repo_name, repo.release_repository, cached_pkgs=cached_pkgs,
         is_disabled=is_source_disabled,
-        other_build_files_same_platform=other_build_files_same_platform)
+        other_build_files_same_platform=other_build_files_same_platform,
+        dist_file=dist_file)
     # jenkinsapi.jenkins.Jenkins evaluates to false if job count is zero
     if isinstance(jenkins, object) and jenkins is not False:
         from ros_buildfarm.jenkins import configure_job
@@ -572,7 +573,8 @@ def configure_release_job(
             cached_pkgs=cached_pkgs, upstream_job_names=upstream_job_names,
             is_disabled=is_disabled,
             docker_base_image_override=docker_base_image_override,
-            skip_rosdep_keys=skip_rosdep_keys)
+            skip_rosdep_keys=skip_rosdep_keys,
+            dist_file=dist_file)
         # jenkinsapi.jenkins.Jenkins evaluates to false if job count is zero
         if isinstance(jenkins, object) and jenkins is not False:
             configure_job(jenkins, job_name, job_config, dry_run=dry_run)
@@ -608,7 +610,8 @@ def _get_sourcedeb_job_config(
         config_url, rosdistro_name, release_build_name,
         config, build_file, os_name, os_code_name,
         pkg_name, repo_name, release_repository, cached_pkgs=None,
-        is_disabled=False, other_build_files_same_platform=None):
+        is_disabled=False, other_build_files_same_platform=None,
+        dist_file=None):
     package_format = package_format_mapping[os_name]
     template_name = 'release/%s/sourcepkg_job.xml.em' % package_format
 
@@ -672,7 +675,7 @@ def _get_sourcedeb_job_config(
         'import_package_job_name': get_import_package_job_name(
             rosdistro_name, package_format),
         'debian_package_name': get_os_package_name(
-            rosdistro_name, pkg_name),
+            rosdistro_name, pkg_name, dist_file=dist_file),
 
         'notify_emails': notify_emails,
         'maintainer_emails': maintainer_emails,
@@ -696,7 +699,8 @@ def _get_binarydeb_job_config(
         cached_pkgs=None, upstream_job_names=None,
         is_disabled=False,
         docker_base_image_override=None,
-        skip_rosdep_keys=None):
+        skip_rosdep_keys=None,
+        dist_file=None):
     package_format = package_format_mapping[os_name]
     template_name = 'release/%s/binarypkg_job.xml.em' % package_format
 
@@ -759,7 +763,7 @@ def _get_binarydeb_job_config(
         'import_package_job_name': get_import_package_job_name(
             rosdistro_name, package_format),
         'debian_package_name': get_os_package_name(
-            rosdistro_name, pkg_name),
+            rosdistro_name, pkg_name, dist_file=dist_file),
 
         'child_projects': sync_to_testing_job_name,
 
@@ -984,7 +988,8 @@ def partition_packages(
     distribution = get_cached_distribution(index, rosdistro_name, cache=dist_cache)
     pkg_names = filter_buildfile_packages_recursively(all_pkg_names, build_file, distribution)
     for pkg_name in sorted(pkg_names):
-        debian_pkg_name = get_os_package_name(rosdistro_name, pkg_name)
+        debian_pkg_name = get_os_package_name(
+            rosdistro_name, pkg_name, dist_file=dist_file)
         if debian_pkg_name in repo_index:
             binary_packages.add(pkg_name)
 
