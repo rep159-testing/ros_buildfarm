@@ -60,9 +60,6 @@ def main(argv=sys.argv[1:]):
     add_argument_docker_base_image_override(parser)
     args = parser.parse_args(argv)
 
-    debian_package_name = get_os_package_name(
-        args.rosdistro_name, args.package_name)
-
     # get expected package version from rosdistro
     index = get_index(args.rosdistro_index_url)
     dist_file = get_distribution_file(index, args.rosdistro_name)
@@ -70,6 +67,9 @@ def main(argv=sys.argv[1:]):
     pkg = dist_file.release_packages[args.package_name]
     repo = dist_file.repositories[pkg.repository_name]
     package_version = repo.release_repository.version
+
+    debian_package_name = get_os_package_name(
+        args.rosdistro_name, args.package_name, dist_file=dist_file)
 
     debian_package_version = package_version
 
