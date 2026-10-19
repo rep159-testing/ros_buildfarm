@@ -62,8 +62,8 @@ RUN sed -i '/    main_tree = repo.tree_drop_dirs(upstream_tree, options.subtarba
 # REP-159 test: install rosdistro fork with format version 3 and binary_rule support
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
 RUN pip3 install --break-system-packages --no-deps \
-    git+https://github.com/rep159-testing/rosdistro@feature/rep159-binary-naming-regex \
-    git+https://github.com/rep159-testing/rosdep@3d52dadcbe13
+    git+https://github.com/rep159-testing/rosdistro@@feature/rep159-binary-naming-regex \
+    git+https://github.com/rep159-testing/rosdep@@3d52dadcbe13
 
 USER buildfarm
 ENTRYPOINT ["sh", "-c"]
