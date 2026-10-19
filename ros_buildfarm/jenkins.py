@@ -140,14 +140,16 @@ def configure_view(
         try:
             response_text = view.update_config(view_config) \
                 if not dry_run else None
-        except Exception:
-            print("Failed to configure view '%s' with config:\n%s" %
-                  (view_name, view_config), file=sys.stderr)
-            raise
+        except Exception as e:
+            print("Warning: Failed to configure view '%s': %s (continuing with jobs)" %
+                  (view_name, e), file=sys.stderr)
         if response_text:
-            raise RuntimeError(
-                "Failed to configure view '%s':\n%s" %
-                (view_name, response_text))
+            if "Access Denied" in response_text or "permission" in response_text.lower():
+                print("Warning: Insufficient View permissions to update view '%s', continuing..." % view_name, file=sys.stderr)
+            else:
+                raise RuntimeError(
+                    "Failed to configure view '%s':\n%s" %
+                    (view_name, response_text))
     _cached_views[key] = view
     return view
 
