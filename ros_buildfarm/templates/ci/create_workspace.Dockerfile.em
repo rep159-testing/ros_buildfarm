@@ -83,6 +83,13 @@ RUN sudo -H -u buildfarm -- git config --global user.email "jenkins@@ros.invalid
     custom_rosdep_urls=custom_rosdep_urls,
 ))@
 
+# REP-159: Install rosdistro (install-rule branch) and rosdep forks
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
+RUN pip3 install --break-system-packages --no-deps \
+    git+https://github.com/rep159-testing/rosdistro@@feature/rep159-install-rule \
+    git+https://github.com/rep159-testing/rosdep@@3d52dadcbe13
+
+
 # always ensure that the apt cache is up-to-date
 RUN echo "@now_str"
 RUN python3 -u /tmp/wrapper_scripts/apt.py update
