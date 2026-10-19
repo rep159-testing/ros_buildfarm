@@ -41,7 +41,8 @@ def get_sources(
 
     pkg_version = repo.release_repository.version
     tag = _get_source_tag(
-        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name)
+        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name,
+        dist_file=dist_file)
 
     cmd = [
         'git', 'clone',
@@ -65,7 +66,8 @@ def get_sources(
 
     # If a tarball already exists reuse it
     origtgz_version = pkg_version.split('-')[0]
-    debian_package_name = get_os_package_name(rosdistro_name, pkg_name)
+    debian_package_name = get_os_package_name(
+        rosdistro_name, pkg_name, dist_file=dist_file)
     filename = '%s_%s.orig.tar.gz' % (debian_package_name, origtgz_version)
 
     URL_TEMPLATE = '%s/pool/main/%s/%s/%s'
@@ -106,10 +108,11 @@ def get_sources(
 
 
 def _get_source_tag(
-        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name):
+        rosdistro_name, pkg_name, pkg_version, os_name, os_code_name,
+        dist_file=None):
     assert os_name in ['debian', 'ubuntu']
     return 'debian/%s_%s_%s' % \
-        (get_os_package_name(rosdistro_name, pkg_name),
+        (get_os_package_name(rosdistro_name, pkg_name, dist_file=dist_file),
          pkg_version, os_code_name)
 
 
