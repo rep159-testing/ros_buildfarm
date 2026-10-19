@@ -113,6 +113,9 @@ RUN pip3 install -U auto_abi_checker
 # TODO(nuclearsandwich) add link to Debian bug report when one is opened.
 RUN which update-ccache-symlinks >/dev/null 2>&1 && update-ccache-symlinks
 
+# Test harness: support custom install prefix underlays
+RUN if [ -d /opt/ros/upstream ] && [ ! -d /opt/vendor/upstream ]; then mkdir -p /opt/vendor && ln -s /opt/ros/upstream /opt/vendor/upstream; fi
+
 USER buildfarm
 ENTRYPOINT ["sh", "-c"]
 @{
