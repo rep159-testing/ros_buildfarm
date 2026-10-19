@@ -24,15 +24,16 @@ from ros_buildfarm.common import get_os_package_name
 def get_sourcerpm(
         rosdistro_index_url, rosdistro_name, package_name, sourcepkg_dir,
         skip_download_sourcepkg=False):
-    # ensure that no source subfolder exists
-    rpm_package_name = get_os_package_name(rosdistro_name, package_name)
+    from rosdistro import get_distribution_cache
+    from rosdistro import get_index
+    index = get_index(rosdistro_index_url)
+    dist_cache = get_distribution_cache(index, rosdistro_name)
+    dist_file = dist_cache.distribution_file
+
+    rpm_package_name = get_os_package_name(
+        rosdistro_name, package_name, dist_file=dist_file)
     if not skip_download_sourcepkg:
         # get expected package version from rosdistro
-        from rosdistro import get_distribution_cache
-        from rosdistro import get_index
-        index = get_index(rosdistro_index_url)
-        dist_cache = get_distribution_cache(index, rosdistro_name)
-        dist_file = dist_cache.distribution_file
         assert package_name in dist_file.release_packages
         pkg = dist_file.release_packages[package_name]
         repo = dist_file.repositories[pkg.repository_name]
@@ -58,6 +59,8 @@ def build_binaryrpm(
         skip_tests=False, skip_rosdep_keys=None):
     rpm_package_name = get_os_package_name(rosdistro_name, package_name)
     source_packages = glob.glob(os.path.join(sourcepkg_dir, rpm_package_name + '-*.src.rpm'))
+    if not source_packages:
+        source_packages = glob.glob(os.path.join(sourcepkg_dir, '*.src.rpm'))
     assert len(source_packages) == 1
 
     cmd = [

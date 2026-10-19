@@ -15,6 +15,7 @@
 import argparse
 import sys
 
+from ros_buildfarm.argument import add_argument_debian_package_name
 from ros_buildfarm.argument import add_argument_package_name
 from ros_buildfarm.argument import add_argument_rosdistro_name
 from ros_buildfarm.argument import add_argument_skip_tests
@@ -31,11 +32,13 @@ def main(argv=sys.argv[1:]):
         add_argument_package_name(parser)
         add_argument_sourcepkg_dir(parser)
         add_argument_skip_tests(parser)
+        add_argument_debian_package_name(parser)
         args = parser.parse_args(argv)
 
         return build_binarydeb(
             args.rosdistro_name, args.package_name, args.sourcepkg_dir,
-            skip_tests=args.skip_tests)
+            skip_tests=args.skip_tests,
+            debian_package_name=args.debian_package_name)
 
 
 if __name__ == '__main__':
