@@ -16,6 +16,7 @@ import argparse
 import sys
 
 from ros_buildfarm.argument import add_argument_package_name
+from ros_buildfarm.argument import add_argument_rosdistro_index_url
 from ros_buildfarm.argument import add_argument_rosdistro_name
 from ros_buildfarm.argument import add_argument_sourcepkg_dir
 from ros_buildfarm.binarydeb_job import append_build_timestamp
@@ -26,13 +27,15 @@ def main(argv=sys.argv[1:]):
     with Scope('SUBSECTION', 'append build timestamp'):
         parser = argparse.ArgumentParser(
             description='Append current timestamp to package version')
+        add_argument_rosdistro_index_url(parser)
         add_argument_rosdistro_name(parser)
         add_argument_package_name(parser)
         add_argument_sourcepkg_dir(parser)
         args = parser.parse_args(argv)
 
         return append_build_timestamp(
-            args.rosdistro_name, args.package_name, args.sourcepkg_dir)
+            args.rosdistro_name, args.package_name, args.sourcepkg_dir,
+            rosdistro_index_url=args.rosdistro_index_url)
 
 
 if __name__ == '__main__':

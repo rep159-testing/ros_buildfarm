@@ -25,21 +25,21 @@ from ros_buildfarm.release_common import dpkg_parsechangelog
 def get_sourcedeb(
         rosdistro_index_url, rosdistro_name, package_name, sourcepkg_dir,
         skip_download_sourcepkg=False):
+    from rosdistro import get_distribution_cache
+    from rosdistro import get_index
+    index = get_index(rosdistro_index_url)
+    dist_cache = get_distribution_cache(index, rosdistro_name)
+    dist_file = dist_cache.distribution_file
+
+    debian_package_name = get_os_package_name(rosdistro_name, package_name, dist_file=dist_file)
     # ensure that no source subfolder exists
-    debian_package_name = get_os_package_name(rosdistro_name, package_name)
     subfolders = _get_package_subfolders(sourcepkg_dir, debian_package_name)
     assert not subfolders, \
         ("Sourcedeb directory '%s' must not have any " +
-         "subfolders starting with '%s-'") % (sourcepkg_dir, package_name)
+         "subfolders starting with '%s-'") % (sourcepkg_dir, debian_package_name)
 
-    debian_package_name = get_os_package_name(rosdistro_name, package_name)
     if not skip_download_sourcepkg:
         # get expected package version from rosdistro
-        from rosdistro import get_distribution_cache
-        from rosdistro import get_index
-        index = get_index(rosdistro_index_url)
-        dist_cache = get_distribution_cache(index, rosdistro_name)
-        dist_file = dist_cache.distribution_file
         assert package_name in dist_file.release_packages
         pkg = dist_file.release_packages[package_name]
         repo = dist_file.repositories[pkg.repository_name]
@@ -90,10 +90,22 @@ def get_sourcedeb(
               ' '.join(sorted(maintainer_emails)))
 
 
-def append_build_timestamp(rosdistro_name, package_name, sourcepkg_dir):
-    # ensure that one source subfolder exists
-    debian_package_name = get_os_package_name(rosdistro_name, package_name)
+def append_build_timestamp(
+        rosdistro_name, package_name, sourcepkg_dir,
+        rosdistro_index_url=None, debian_package_name=None):
+    if not debian_package_name:
+        dist_file = None
+        if rosdistro_index_url:
+            from rosdistro import get_distribution_cache
+            from rosdistro import get_index
+            index = get_index(rosdistro_index_url)
+            dist_cache = get_distribution_cache(index, rosdistro_name)
+            dist_file = dist_cache.distribution_file
+        debian_package_name = get_os_package_name(
+            rosdistro_name, package_name, dist_file=dist_file)
     subfolders = _get_package_subfolders(sourcepkg_dir, debian_package_name)
+    if not subfolders:
+        subfolders = _get_package_subfolders(sourcepkg_dir)
     assert len(subfolders) == 1, subfolders
     source_dir = subfolders[0]
 
@@ -117,10 +129,14 @@ def append_build_timestamp(rosdistro_name, package_name, sourcepkg_dir):
     subprocess.check_call(cmd, cwd=source_dir)
 
 
-def build_binarydeb(rosdistro_name, package_name, sourcepkg_dir, skip_tests=False):
-    # ensure that one source subfolder exists
-    debian_package_name = get_os_package_name(rosdistro_name, package_name)
+def build_binarydeb(
+        rosdistro_name, package_name, sourcepkg_dir,
+        skip_tests=False, debian_package_name=None):
+    if not debian_package_name:
+        debian_package_name = get_os_package_name(rosdistro_name, package_name)
     subfolders = _get_package_subfolders(sourcepkg_dir, debian_package_name)
+    if not subfolders:
+        subfolders = _get_package_subfolders(sourcepkg_dir)
     assert len(subfolders) == 1, subfolders
     source_dir = subfolders[0]
 
@@ -159,13 +175,13 @@ You should look above `E: Building failed` in the build log for the actual cause
 """.format(' '.join(cmd)))
 
 
-def _get_package_subfolders(basepath, debian_package_name):
+def _get_package_subfolders(basepath, debian_package_name=None):
     subfolders = []
     for filename in os.listdir(basepath):
         path = os.path.join(basepath, filename)
         if not os.path.isdir(path):
             continue
-        if filename.startswith('%s-' % debian_package_name):
+        if debian_package_name is None or filename.startswith('%s-' % debian_package_name):
             subfolders.append(path)
     return subfolders
 

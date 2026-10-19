@@ -111,6 +111,7 @@ cmd = \
     ' ' + rosdistro_name + \
     ' ' + package_name + \
     ' --sourcepkg-dir ' + binarypkg_dir + \
+    (' --debian-package-name ' + debian_package_name if vars().get('debian_package_name') else '') + \
     (' --skip-tests' if skip_tests else '')
 }@
 CMD ["@cmd"]
