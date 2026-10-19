@@ -51,7 +51,10 @@ RUN echo "@today_str"
     os_code_name=os_code_name,
 ))@
 
-RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y debhelper dh-cargo dpkg dpkg-dev git git-buildpackage python3-catkin-pkg-modules python3-rosdistro-modules python3-yaml
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y debhelper dh-cargo dpkg dpkg-dev git git-buildpackage python3-catkin-pkg-modules python3-rosdistro-modules python3-yaml python3-pip
+RUN pip3 install --break-system-packages --no-deps \
+    git+https://github.com/rep159-testing/rosdistro@@feature/rep159-install-rule \
+    git+https://github.com/rep159-testing/rosdep@@3d52dadcbe13
 @[if os_name == 'ubuntu' and os_code_name == 'yakkety']@
 @# git-buildpackage in Yakkety has a bug resulting in using the current time for
 @# the to be archived files resulting in non-deterministic checksums for the tarball

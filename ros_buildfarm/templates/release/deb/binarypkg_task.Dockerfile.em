@@ -64,7 +64,10 @@ RUN echo "@today_str"
     os_code_name=os_code_name,
 ))@
 
-RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y git python3-yaml
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y git python3-yaml python3-pip
+RUN pip3 install --break-system-packages --no-deps \
+    git+https://github.com/rep159-testing/rosdistro@@feature/rep159-install-rule \
+    git+https://github.com/rep159-testing/rosdep@@3d52dadcbe13
 
 # Workaround for focal armhf certificate rehash issue
 RUN . /etc/os-release && test "$VERSION_ID" = "20.04" && test "$(uname -m)" = "armv7l" && c_rehash || true
