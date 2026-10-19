@@ -65,7 +65,7 @@ RUN echo "@today_str"
     os_code_name=os_code_name,
 ))@
 
-RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y devscripts dpkg-dev python3-apt python3-catkin-pkg-modules python3-empy python3-rosdistro-modules python3-yaml python3-pip
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y devscripts dpkg-dev git python3-apt python3-catkin-pkg-modules python3-empy python3-rosdistro-modules python3-yaml python3-pip
 RUN pip3 install --break-system-packages --no-deps \
     git+https://github.com/rep159-testing/rosdistro@@feature/rep159-install-rule \
     git+https://github.com/rep159-testing/rosdep@@3d52dadcbe13
