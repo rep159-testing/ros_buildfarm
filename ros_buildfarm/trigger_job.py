@@ -85,7 +85,8 @@ def trigger_release_jobs(
             continue
         pkg_version = repo.release_repository.version
 
-        debian_package_name = get_os_package_name(rosdistro_name, pkg_name)
+        debian_package_name = get_os_package_name(
+            rosdistro_name, pkg_name, dist_file=dist_file)
 
         for target in targets:
             job_name = get_sourcedeb_job_name(
