@@ -21,6 +21,13 @@ def main(argv=sys.argv[1:]):
     max_tries = 10
     known_error_strings = [
         'Connection timed out',
+        'GnuTLS recv error',
+        'The TLS connection was non-properly terminated',
+        'Could not resolve host',
+        'Failed to connect',
+        'Connection reset by peer',
+        'Operation timed out',
+        'RPC failed; curl',
     ]
 
     command = argv[0]
