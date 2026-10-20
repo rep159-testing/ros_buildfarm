@@ -24,8 +24,8 @@
   </properties>
 @(SNIPPET(
     'scm_git',
-    url='https://github.com/ros-infrastructure/reprepro-updater.git',
-    branch_name='refactor',
+    url='https://github.com/rep159-testing/reprepro-updater.git',
+    branch_name='feat/package-prefix',
     relative_target_dir='reprepro-updater',
     refspec=None,
 ))@
@@ -43,7 +43,7 @@
     script='\n'.join([
         'echo "# BEGIN SECTION: sync packages to main repo"',
         'export PYTHONPATH=$WORKSPACE/reprepro-updater/src:$PYTHONPATH',
-        'python3 -u $WORKSPACE/reprepro-updater/scripts/sync_ros_packages.py ubuntu_main --upstream-ros ubuntu_testing -r %s -c' % rosdistro_name,
+        'python3 -u $WORKSPACE/reprepro-updater/scripts/sync_ros_packages.py ubuntu_main --upstream-ros ubuntu_testing -r %s --package-prefix %s -c' % (rosdistro_name, package_prefix),
         'echo "# END SECTION"',
     ]),
 ))@
