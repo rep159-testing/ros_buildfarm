@@ -114,3 +114,30 @@ def test_dist_file_custom_prefix_resolution():
     assert get_distribution_install_prefix(dist_file) == '/opt/acme/acme_distro'
     assert get_default_parent_result_spaces('acme_distro', environ={}, dist_file=dist_file) == \
         ['/opt/acme/acme_distro']
+
+
+def test_chained_binary_import_underlays():
+    class _MockIndex:
+        def __init__(self, distros):
+            self.distributions = distros
+
+    grandparent = _DistFile('upstream', extends=[])
+    parent = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import'}
+    ])
+    child = _DistFile('chainext', extends=[
+        {'distro_name': 'binext', 'extension_method': 'binary_import'}
+    ])
+
+    import rosdistro
+    orig_get_dist_file = rosdistro.get_distribution_file
+    try:
+        dist_map = {'upstream': grandparent, 'binext': parent, 'chainext': child}
+        rosdistro.get_distribution_file = lambda idx, name: dist_map[name]
+        index = _MockIndex(dist_map)
+
+        underlays = get_binary_import_underlays(child, index=index)
+        assert underlays == ['/opt/ros/upstream', '/opt/ros/binext']
+    finally:
+        rosdistro.get_distribution_file = orig_get_dist_file
+
