@@ -99,8 +99,14 @@ def configure_view(
         print(
             "Creating view '%s' of type '%s'%s" %
             (view_name, view_type, dry_run_suffix))
-        view = jenkins.views.create(view_name, view_type=view_type) \
-            if not dry_run else None
+        try:
+            view = jenkins.views.create(view_name, view_type=view_type) \
+                if not dry_run else None
+        except Exception as e:
+            print(
+                "Warning: Failed to create view '%s': %s (skipping view, proceeding with jobs)" %
+                (view_name, e), file=sys.stderr)
+            return None
         remote_view_config = view.get_config() \
             if view is not None else None
     else:
@@ -109,19 +115,30 @@ def configure_view(
         remote_view_config = view.get_config()
         remote_view_type = _get_view_type(remote_view_config)
         if remote_view_type != view_type:
-            del jenkins.views[view_name]
-            print(
-                "Recreating view '%s' of type '%s'%s" %
-                (view_name, view_type, dry_run_suffix))
-            view = jenkins.views.create(view_name, view_type=view_type) \
-                if not dry_run else None
+            try:
+                del jenkins.views[view_name]
+                print(
+                    "Recreating view '%s' of type '%s'%s" %
+                    (view_name, view_type, dry_run_suffix))
+                view = jenkins.views.create(view_name, view_type=view_type) \
+                    if not dry_run else None
+            except Exception as e:
+                print(
+                    "Warning: Failed to recreate view '%s': %s (skipping view, proceeding with jobs)" %
+                    (view_name, e), file=sys.stderr)
+                return None
             remote_view_config = view.get_config() \
                 if view is not None else None
 
     if not remote_view_config:
-        print(
-            'Can not produce diff during dry run if the view is new or of '
-            'different type', file=sys.stderr)
+        if not dry_run:
+            print(
+                "Skipping view '%s' as remote view is not available" % view_name,
+                file=sys.stderr)
+        else:
+            print(
+                'Can not produce diff during dry run if the view is new or of '
+                'different type', file=sys.stderr)
         return None
 
     diff = _diff_configs(remote_view_config, view_config, context_lines)
