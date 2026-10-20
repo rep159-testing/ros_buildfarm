@@ -42,7 +42,8 @@ RUN echo "@today_str"
 
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y git python3-pip python3-rosdistro-modules python3-yaml
 RUN pip3 install --break-system-packages --no-deps \
-    git+https://github.com/rep159-testing/rosdistro@@feature/rep159-binary-naming-regex
+    https://github.com/rep159-testing/rosdistro/archive/refs/heads/feature/rep159-install-rule.tar.gz
+
 
 USER buildfarm
 ENTRYPOINT ["sh", "-c"]
