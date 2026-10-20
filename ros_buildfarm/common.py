@@ -251,18 +251,41 @@ def get_distribution_install_prefix(dist_file, pkg_name=None):
     return '/opt/ros/%s' % clean_distro if clean_distro else '/usr'
 
 
-def get_binary_import_underlays(dist_file, index=None):
+def get_binary_import_underlays(dist_file, index=None, _visited=None):
     """
     Return the installation prefixes of binary_import parents for dist_file.
 
     If parent distributions define custom install_rule/prefix in the dist file
-    or within the extends block, those prefixes are resolved.
+    or within the extends block, those prefixes are resolved. Ancestor underlays
+    are collected recursively in hierarchical order (root ancestors first).
     """
+    if _visited is None:
+        _visited = set()
+    dist_name = getattr(dist_file, 'name', None)
+    if dist_name and dist_name in _visited:
+        return []
+    if dist_name:
+        _visited.add(dist_name)
+
     underlays = []
     extends = getattr(dist_file, 'extends', None) or []
     for ext in extends:
         if ext.get('extension_method') == 'binary_import':
             parent_distro = ext['distro_name']
+
+            # Recursively gather ancestor underlays from parent distributions
+            if index and hasattr(index, 'distributions') and parent_distro in index.distributions:
+                try:
+                    from rosdistro import get_distribution_file
+                    p_dist_file = get_distribution_file(index, parent_distro)
+                    ancestor_underlays = get_binary_import_underlays(
+                        p_dist_file, index=index, _visited=_visited)
+                    for anc in ancestor_underlays:
+                        if anc not in underlays:
+                            underlays.append(anc)
+                except Exception:
+                    pass
+
             parent_prefix = None
             if 'install_rule' in ext:
                 rule = ext['install_rule']
@@ -288,6 +311,7 @@ def get_binary_import_underlays(dist_file, index=None):
             if parent_prefix not in underlays:
                 underlays.append(parent_prefix)
     return underlays
+
 
 
 def get_default_parent_result_spaces(rosdistro_name, environ=None, dist_file=None):
