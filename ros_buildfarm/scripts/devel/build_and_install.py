@@ -21,6 +21,7 @@ from ros_buildfarm.argument import add_argument_build_tool
 from ros_buildfarm.argument import add_argument_build_tool_args
 from ros_buildfarm.argument import add_argument_ros_version
 from ros_buildfarm.argument import add_argument_run_abichecker
+from ros_buildfarm.common import get_default_parent_result_spaces
 from ros_buildfarm.common import get_packages_in_workspaces
 from ros_buildfarm.common import Scope
 from ros_buildfarm.workspace import call_build_tool
@@ -101,6 +102,9 @@ def main(argv=sys.argv[1:]):
             parent_result_spaces = None
             if args.parent_result_space:
                 parent_result_spaces = args.parent_result_space
+            if parent_result_spaces is None:
+                parent_result_spaces = get_default_parent_result_spaces(
+                    args.rosdistro_name)
             cmake_args = ['-DBUILD_TESTING=0']
             if args.ros_version == 1:
                 cmake_args.append('-DCATKIN_SKIP_TESTING=1')
