@@ -160,8 +160,26 @@ def call_build_tool(
             env['CMAKE_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_cpp) if curr_cpp else parent_result_space
             curr_colcon = env.get('COLCON_PREFIX_PATH', '')
             env['COLCON_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_colcon) if curr_colcon else parent_result_space
-            cmd = 'export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}" && export COLCON_PREFIX_PATH="%s:${COLCON_PREFIX_PATH}" && %s' % (
-                parent_result_space, parent_result_space, cmd)
+            lib_dirs = [
+                os.path.join(parent_result_space, 'lib'),
+                os.path.join(parent_result_space, 'lib', 'x86_64-linux-gnu'),
+                os.path.join(parent_result_space, 'lib', 'aarch64-linux-gnu'),
+            ]
+            valid_lib_dirs = [d for d in lib_dirs if os.path.isdir(d)]
+            if not valid_lib_dirs:
+                valid_lib_dirs = [os.path.join(parent_result_space, 'lib')]
+            lib_str = ':'.join(valid_lib_dirs)
+            curr_ld = env.get('LD_LIBRARY_PATH', '')
+            env['LD_LIBRARY_PATH'] = '%s:%s' % (lib_str, curr_ld) if curr_ld else lib_str
+            bin_dir = os.path.join(parent_result_space, 'bin')
+            curr_path = env.get('PATH', '')
+            if os.path.isdir(bin_dir):
+                env['PATH'] = '%s:%s' % (bin_dir, curr_path) if curr_path else bin_dir
+            cmd = (
+                'export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}" && '
+                'export COLCON_PREFIX_PATH="%s:${COLCON_PREFIX_PATH}" && '
+                'export LD_LIBRARY_PATH="%s:${LD_LIBRARY_PATH}" && %s'
+            ) % (parent_result_space, parent_result_space, lib_str, cmd)
 
     # prevent colcon from crawling the catkin results
     if build_tool != 'colcon':
