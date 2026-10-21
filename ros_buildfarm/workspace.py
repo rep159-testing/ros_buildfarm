@@ -155,6 +155,13 @@ def call_build_tool(
                 os.path.join(parent_result_space, '.colcon_install_layout')
             ):
                 cmd = 'COLCON_CURRENT_PREFIX=%s %s' % (parent_result_space, cmd)
+        elif os.path.exists(parent_result_space):
+            curr_cpp = env.get('CMAKE_PREFIX_PATH', '')
+            env['CMAKE_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_cpp) if curr_cpp else parent_result_space
+            curr_colcon = env.get('COLCON_PREFIX_PATH', '')
+            env['COLCON_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_colcon) if curr_colcon else parent_result_space
+            cmd = 'export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}" && export COLCON_PREFIX_PATH="%s:${COLCON_PREFIX_PATH}" && %s' % (
+                parent_result_space, parent_result_space, cmd)
 
     # prevent colcon from crawling the catkin results
     if build_tool != 'colcon':
