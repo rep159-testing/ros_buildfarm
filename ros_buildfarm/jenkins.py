@@ -92,83 +92,89 @@ def configure_view(
     if not isinstance(jenkins, JenkinsProxy):
         _cached_views[key] = view_config
         return view_config
-    view_type = _get_view_type(view_config)
-    create_view = view_name not in jenkins.views
-    dry_run_suffix = ' (dry run)' if dry_run else ''
-    if create_view:
-        print(
-            "Creating view '%s' of type '%s'%s" %
-            (view_name, view_type, dry_run_suffix))
-        try:
-            view = jenkins.views.create(view_name, view_type=view_type) \
-                if not dry_run else None
-        except Exception as e:
+    try:
+        view_type = _get_view_type(view_config)
+        create_view = view_name not in jenkins.views
+        dry_run_suffix = ' (dry run)' if dry_run else ''
+        if create_view:
             print(
-                "Warning: Failed to create view '%s': %s (skipping view, proceeding with jobs)" %
-                (view_name, e), file=sys.stderr)
-            return None
-        remote_view_config = view.get_config() \
-            if view is not None else None
-    else:
-        print("Ensure that view '%s' exists" % view_name)
-        view = jenkins.views[view_name]
-        remote_view_config = view.get_config()
-        remote_view_type = _get_view_type(remote_view_config)
-        if remote_view_type != view_type:
+                "Creating view '%s' of type '%s'%s" %
+                (view_name, view_type, dry_run_suffix))
             try:
-                del jenkins.views[view_name]
-                print(
-                    "Recreating view '%s' of type '%s'%s" %
-                    (view_name, view_type, dry_run_suffix))
                 view = jenkins.views.create(view_name, view_type=view_type) \
                     if not dry_run else None
             except Exception as e:
                 print(
-                    "Warning: Failed to recreate view '%s': %s (skipping view, proceeding with jobs)" %
+                    "Warning: Failed to create view '%s': %s (skipping view, proceeding with jobs)" %
                     (view_name, e), file=sys.stderr)
                 return None
             remote_view_config = view.get_config() \
                 if view is not None else None
-
-    if not remote_view_config:
-        if not dry_run:
-            print(
-                "Skipping view '%s' as remote view is not available" % view_name,
-                file=sys.stderr)
         else:
-            print(
-                'Can not produce diff during dry run if the view is new or of '
-                'different type', file=sys.stderr)
-        return None
+            print("Ensure that view '%s' exists" % view_name)
+            view = jenkins.views[view_name]
+            remote_view_config = view.get_config()
+            remote_view_type = _get_view_type(remote_view_config)
+            if remote_view_type != view_type:
+                try:
+                    del jenkins.views[view_name]
+                    print(
+                        "Recreating view '%s' of type '%s'%s" %
+                        (view_name, view_type, dry_run_suffix))
+                    view = jenkins.views.create(view_name, view_type=view_type) \
+                        if not dry_run else None
+                except Exception as e:
+                    print(
+                        "Warning: Failed to recreate view '%s': %s (skipping view, proceeding with jobs)" %
+                        (view_name, e), file=sys.stderr)
+                    return None
+                remote_view_config = view.get_config() \
+                    if view is not None else None
 
-    diff = _diff_configs(remote_view_config, view_config, context_lines)
-    # evaluate generator since it might yield no values
-    diff = list(diff)
-    if not diff:
-        print("Skipped '%s' because the config is the same%s" %
-              (view_name, dry_run_suffix))
-    else:
-        print("Updating view '%s'%s" % (view_name, dry_run_suffix))
-        if not create_view:
-            print('   ', '<<<')
-            for line in diff:
-                print('   ', line.rstrip('\n'))
-            print('   ', '>>>')
-        try:
-            response_text = view.update_config(view_config) \
-                if not dry_run else None
-        except Exception as e:
-            print("Warning: Failed to configure view '%s': %s (continuing with jobs)" %
-                  (view_name, e), file=sys.stderr)
-        if response_text:
-            if "Access Denied" in response_text or "permission" in response_text.lower():
-                print("Warning: Insufficient View permissions to update view '%s', continuing..." % view_name, file=sys.stderr)
+        if not remote_view_config:
+            if not dry_run:
+                print(
+                    "Skipping view '%s' as remote view is not available" % view_name,
+                    file=sys.stderr)
             else:
-                raise RuntimeError(
-                    "Failed to configure view '%s':\n%s" %
-                    (view_name, response_text))
-    _cached_views[key] = view
-    return view
+                print(
+                    'Can not produce diff during dry run if the view is new or of '
+                    'different type', file=sys.stderr)
+            return None
+
+        diff = _diff_configs(remote_view_config, view_config, context_lines)
+        # evaluate generator since it might yield no values
+        diff = list(diff)
+        if not diff:
+            print("Skipped '%s' because the config is the same%s" %
+                  (view_name, dry_run_suffix))
+        else:
+            print("Updating view '%s'%s" % (view_name, dry_run_suffix))
+            if not create_view:
+                print('   ', '<<<')
+                for line in diff:
+                    print('   ', line.rstrip('\n'))
+                print('   ', '>>>')
+            response_text = None
+            try:
+                response_text = view.update_config(view_config) \
+                    if not dry_run else None
+            except Exception as e:
+                print("Warning: Failed to configure view '%s': %s (continuing with jobs)" %
+                      (view_name, e), file=sys.stderr)
+            if response_text:
+                if "Access Denied" in response_text or "permission" in response_text.lower():
+                    print("Warning: Insufficient View permissions to update view '%s', continuing..." % view_name, file=sys.stderr)
+                else:
+                    raise RuntimeError(
+                        "Failed to configure view '%s':\n%s" %
+                        (view_name, response_text))
+        _cached_views[key] = view
+        return view
+    except Exception as e:
+        print("Warning: View operation for '%s' failed: %s (skipping view, proceeding with jobs)" %
+              (view_name, e), file=sys.stderr)
+        return None
 
 
 def get_view_config(
