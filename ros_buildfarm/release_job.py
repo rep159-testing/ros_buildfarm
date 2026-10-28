@@ -196,6 +196,8 @@ def configure_release_jobs(
     all_source_job_names = []
     all_binary_job_names = []
     for pkg_name in [p.name for _, p in ordered_pkg_tuples]:
+        if pkg_name not in dist_file.release_packages:
+            continue
         if whitelist_package_names:
             if pkg_name not in whitelist_package_names:
                 print("Skipping package '%s' not in the explicitly passed list" %
