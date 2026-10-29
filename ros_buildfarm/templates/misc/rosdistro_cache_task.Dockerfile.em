@@ -40,7 +40,9 @@ RUN echo "@today_str"
     os_code_name=os_code_name,
 ))@
 
-RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y git python3-catkin-pkg-modules python3-rosdistro python3-yaml
+RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y git python3-catkin-pkg-modules python3-pip python3-rosdistro python3-yaml
+RUN pip3 install --no-deps --force-reinstall https://github.com/rep159-testing/rosdistro/archive/refs/heads/feature/rep159-install-rule.tar.gz && \
+    (cp -f /usr/local/bin/rosdistro_build_cache /usr/bin/rosdistro_build_cache 2>/dev/null || true)
 
 USER buildfarm
 ENTRYPOINT ["sh", "-c"]
