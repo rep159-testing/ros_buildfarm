@@ -140,4 +140,3 @@ def test_chained_binary_import_underlays():
         assert underlays == ['/opt/ros/upstream', '/opt/ros/binext']
     finally:
         rosdistro.get_distribution_file = orig_get_dist_file
-
