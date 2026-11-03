@@ -296,7 +296,6 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
     return underlays
 
 
-
 def get_default_parent_result_spaces(rosdistro_name, environ=None, dist_file=None):
     """
     Return the prefixes to source before building for a rosdistro.
