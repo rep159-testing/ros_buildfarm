@@ -26,6 +26,7 @@ from ros_buildfarm.common import get_github_project_url
 from ros_buildfarm.common import get_implicitly_ignored_package_names
 from ros_buildfarm.common import get_node_label
 from ros_buildfarm.common import get_os_package_name
+from ros_buildfarm.common import get_os_package_name_prefix
 from ros_buildfarm.common import get_package_manifests
 from ros_buildfarm.common import get_release_binary_view_name
 from ros_buildfarm.common import get_release_job_prefix
@@ -870,6 +871,10 @@ def _get_sync_packages_to_testing_job_config(
     package_format = package_format_mapping[os_name]
     template_name = 'release/%s/sync_packages_to_testing_job.xml.em' % package_format
 
+    index = get_index(config.rosdistro_index_url)
+    dist_file = get_distribution_file(index, rosdistro_name, build_file)
+    package_prefix = get_os_package_name_prefix(rosdistro_name, dist_file=dist_file)
+
     repository_args, script_generating_key_files = \
         get_repositories_and_script_generating_key_files(config=config)
 
@@ -880,6 +885,7 @@ def _get_sync_packages_to_testing_job_config(
 
         'config_url': config_url,
         'rosdistro_name': rosdistro_name,
+        'package_prefix': package_prefix,
         'release_build_name': release_build_name,
         'os_name': os_name,
         'os_code_name': os_code_name,
@@ -915,7 +921,7 @@ def configure_sync_packages_to_main_job(
     job_name = get_sync_packages_to_main_job_name(
         rosdistro_name, package_format)
     job_config = _get_sync_packages_to_main_job_config(
-        rosdistro_name, build_file, package_format)
+        rosdistro_name, build_file, package_format, config=config)
 
     # jenkinsapi.jenkins.Jenkins evaluates to false if job count is zero
     if isinstance(jenkins, object) and jenkins is not False:
@@ -930,11 +936,20 @@ def get_sync_packages_to_main_job_name(rosdistro_name, package_format):
         view_name, '' if package_format == 'deb' else '-' + package_format)
 
 
-def _get_sync_packages_to_main_job_config(rosdistro_name, build_file, package_format):
+def _get_sync_packages_to_main_job_config(
+        rosdistro_name, build_file, package_format, config=None):
     template_name = 'release/%s/sync_packages_to_main_job.xml.em' % package_format
+
+    package_prefix = None
+    if config:
+        index = get_index(config.rosdistro_index_url)
+        dist_file = get_distribution_file(index, rosdistro_name, build_file)
+        package_prefix = get_os_package_name_prefix(rosdistro_name, dist_file=dist_file)
+
     job_data = {
         'ros_buildfarm_repository': get_repository(),
         'rosdistro_name': rosdistro_name,
+        'package_prefix': package_prefix or ('ros-%s-' % rosdistro_name),
 
         'deb_sync_to_main_job_name': get_sync_packages_to_main_job_name(rosdistro_name, 'deb'),
         'sync_targets': build_file.targets,
