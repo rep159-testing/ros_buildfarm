@@ -37,7 +37,7 @@ class _MockDistFile:
         rule = self.overrides.get(pkg_name, self.binary_rule)
         if rule and isinstance(rule, dict) and 'search' in rule and 'replace' in rule:
             import re
-            replace_pattern = rule['replace'].replace('{distro}', clean_distro).replace('{DISTRO}', clean_distro)
+            replace_pattern = rule['replace'].replace('{distro}', clean_distro)
             replace_pattern = replace_pattern.replace('_', '-')
             return re.sub(rule['search'], replace_pattern, clean_pkg)
         return 'ros-%s-%s' % (clean_distro, clean_pkg)
