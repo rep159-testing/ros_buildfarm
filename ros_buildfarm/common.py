@@ -201,7 +201,7 @@ def get_os_package_name_prefix(rosdistro_name, dist_file=None):
     if dist_file and hasattr(dist_file, 'binary_rule') and dist_file.binary_rule:
         rule = dist_file.binary_rule
         if isinstance(rule, dict) and rule.get('search') == '^':
-            prefix = rule.get('replace', '').replace('{distro}', clean_distro).replace('{DISTRO}', clean_distro)
+            prefix = rule.get('replace', '').replace('{distro}', clean_distro)
             return prefix.replace('_', '-')
     return 'ros-%s-' % clean_distro
 
