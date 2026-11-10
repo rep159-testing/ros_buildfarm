@@ -725,7 +725,8 @@ def _get_binarydeb_job_config(
             for var, value in sorted(build_file.build_environment_variables.items())]
 
     sync_to_testing_job_name = [get_sync_packages_to_testing_job_name(
-        rosdistro_name, os_name, os_code_name, arch)]
+        rosdistro_name, os_name, os_code_name, arch,
+        release_build_name=release_build_name)]
 
     maintainer_emails = _get_maintainer_emails(cached_pkgs, pkg_name) \
         if build_file.notify_maintainers \
@@ -847,7 +848,8 @@ def configure_sync_packages_to_testing_job(
         jenkins = connect(config.jenkins_url)
 
     job_name = get_sync_packages_to_testing_job_name(
-        rosdistro_name, os_name, os_code_name, arch)
+        rosdistro_name, os_name, os_code_name, arch,
+        release_build_name=release_build_name)
     job_config = _get_sync_packages_to_testing_job_config(
         config_url, rosdistro_name, release_build_name, os_name, os_code_name,
         arch, config, build_file)
@@ -860,8 +862,8 @@ def configure_sync_packages_to_testing_job(
 
 
 def get_sync_packages_to_testing_job_name(
-        rosdistro_name, os_name, os_code_name, arch):
-    view_name = get_release_job_prefix(rosdistro_name)
+        rosdistro_name, os_name, os_code_name, arch, release_build_name=None):
+    view_name = get_release_job_prefix(rosdistro_name, release_build_name)
     return '%s_sync-packages-to-testing%s_%s_%s' % (
         view_name, '' if package_format_mapping[os_name] == 'deb' else '_' + os_name,
         os_code_name, arch)
@@ -921,9 +923,10 @@ def configure_sync_packages_to_main_job(
     package_format = package_formats.pop()
 
     job_name = get_sync_packages_to_main_job_name(
-        rosdistro_name, package_format)
+        rosdistro_name, package_format, release_build_name=release_build_name)
     job_config = _get_sync_packages_to_main_job_config(
-        rosdistro_name, build_file, package_format, config=config)
+        rosdistro_name, build_file, package_format, config=config,
+        release_build_name=release_build_name)
 
     # jenkinsapi.jenkins.Jenkins evaluates to false if job count is zero
     if isinstance(jenkins, object) and jenkins is not False:
@@ -932,14 +935,16 @@ def configure_sync_packages_to_main_job(
     return (job_name, job_config)
 
 
-def get_sync_packages_to_main_job_name(rosdistro_name, package_format):
-    view_name = get_release_job_prefix(rosdistro_name)
+def get_sync_packages_to_main_job_name(
+        rosdistro_name, package_format, release_build_name=None):
+    view_name = get_release_job_prefix(rosdistro_name, release_build_name)
     return '%s_sync-packages-to-main%s' % (
         view_name, '' if package_format == 'deb' else '-' + package_format)
 
 
 def _get_sync_packages_to_main_job_config(
-        rosdistro_name, build_file, package_format, config=None):
+        rosdistro_name, build_file, package_format, config=None,
+        release_build_name=None):
     template_name = 'release/%s/sync_packages_to_main_job.xml.em' % package_format
 
     package_prefix = None
@@ -953,7 +958,8 @@ def _get_sync_packages_to_main_job_config(
         'rosdistro_name': rosdistro_name,
         'package_prefix': package_prefix or ('ros-%s-' % rosdistro_name),
 
-        'deb_sync_to_main_job_name': get_sync_packages_to_main_job_name(rosdistro_name, 'deb'),
+        'deb_sync_to_main_job_name': get_sync_packages_to_main_job_name(
+            rosdistro_name, 'deb', release_build_name=release_build_name),
         'sync_targets': build_file.targets,
 
         'notify_emails': build_file.notify_emails,
