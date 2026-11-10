@@ -273,13 +273,13 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
             if 'install_rule' in ext:
                 rule = ext['install_rule']
                 if isinstance(rule, str):
-                    parent_prefix = rule.replace('{distro}', parent_distro).replace('{DISTRO}', parent_distro)
+                    parent_prefix = rule.replace('{distro}', parent_distro)
                 elif isinstance(rule, dict) and 'search' in rule and 'replace' in rule:
                     import re
                     clean_parent = parent_distro.replace('_', '-')
                     parent_prefix = re.sub(
                         rule['search'],
-                        rule['replace'].replace('{distro}', clean_parent).replace('{DISTRO}', clean_parent),
+                        rule['replace'].replace('{distro}', clean_parent),
                         clean_parent)
             if not parent_prefix and index and hasattr(index, 'distributions') and parent_distro in index.distributions:
                 try:
