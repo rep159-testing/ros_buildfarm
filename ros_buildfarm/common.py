@@ -416,14 +416,16 @@ def get_sourcedeb_job_name(rosdistro_name, release_build_name,
                            pkg_name, os_name, os_code_name):
     view_name = get_release_source_view_name(
         rosdistro_name, os_name, os_code_name)
-    return '%s__%s__%s_%s__source' % \
-        (view_name, pkg_name, os_name, os_code_name)
+    short_build = get_short_build_name(release_build_name) if release_build_name else ''
+    pkg_prefix = '%s_' % short_build if short_build == 'extbin' else ''
+    return '%s__%s%s__%s_%s__source' % \
+        (view_name, pkg_prefix, pkg_name, os_name, os_code_name)
 
 
 def get_release_binary_view_prefix(rosdistro_name, release_build_name):
     prefix = '%s%s' % (rosdistro_name[0].upper(), 'bin')
     short_release_build_name = get_short_build_name(release_build_name)
-    if short_release_build_name:
+    if short_release_build_name and short_release_build_name != 'extbin':
         prefix += '_%s' % short_release_build_name
     return prefix
 
@@ -443,8 +445,10 @@ def get_binarydeb_job_name(rosdistro_name, release_build_name,
                            pkg_name, os_name, os_code_name, arch):
     view_name = get_release_binary_view_name(
         rosdistro_name, release_build_name, os_name, os_code_name, arch)
-    return '%s__%s__%s_%s_%s__binary' % \
-        (view_name, pkg_name, os_name, os_code_name, arch)
+    short_build = get_short_build_name(release_build_name) if release_build_name else ''
+    pkg_prefix = '%s_' % short_build if short_build == 'extbin' else ''
+    return '%s__%s%s__%s_%s_%s__binary' % \
+        (view_name, pkg_prefix, pkg_name, os_name, os_code_name, arch)
 
 
 def get_short_build_name(build_name):
