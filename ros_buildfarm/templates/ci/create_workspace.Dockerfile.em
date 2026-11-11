@@ -76,8 +76,8 @@ RUN echo "@today_str"
 
 # REP-159 test: shadow the apt rosdistro and rosdep modules with KmoM88's
 # REP-2015 forks. The rosdistro fork (rep159-testing, branch
-# rep159-child-ros-workspace) parses distribution file version 3, resolves
-# `extends` and lets a binary_import child release its own ros_workspace;
+# rep159-workspace-package) parses distribution file version 3, resolves
+# `extends` and reads a distribution's workspace_package;
 # the rosdep fork names a binary_import parent's binaries. pip installs
 # under /usr/local, which precedes /usr/lib/python3/dist-packages on
 # sys.path, so rosdep update, create_workspace.py and
@@ -85,7 +85,7 @@ RUN echo "@today_str"
 # Pinned by full SHA.
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
 RUN pip3 install --break-system-packages --no-deps \
-    git+https://github.com/rep159-testing/rosdistro@@78c7db824f6d606b2efb6181cdaeae4494daf885 \
+    git+https://github.com/rep159-testing/rosdistro@@bc0600f8d3cdbd1d8ed03b436fb7d2592a7f550b \
     git+https://github.com/KmoM88/rosdep@@3d52dadcbe13cccc6d9292db27569641c88dcdbd
 
 # needed for 'vcs custom --git --args merge' invocation

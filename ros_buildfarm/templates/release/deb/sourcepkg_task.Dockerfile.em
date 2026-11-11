@@ -54,13 +54,13 @@ RUN echo "@today_str"
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y debhelper dpkg dpkg-dev git git-buildpackage python3-catkin-pkg-modules python3-rosdistro-modules python3-yaml
 
 # REP-159 test: shadow the apt rosdistro module with the rep159-testing
-# rosdistro fork, branch rep159-child-ros-workspace. It parses distribution
-# file version 3 and lets a binary_import child release its own
-# ros_workspace. pip installs under /usr/local, which precedes
-# /usr/lib/python3/dist-packages on sys.path. Pinned by full SHA.
+# rosdistro fork, branch rep159-workspace-package. It parses distribution
+# file version 3 and reads a distribution's workspace_package, the package
+# a binary_import child may release itself. pip installs under /usr/local,
+# which precedes /usr/lib/python3/dist-packages on sys.path. Pinned by full SHA.
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends git python3-pip
 RUN pip3 install --break-system-packages --no-deps \
-    git+https://github.com/rep159-testing/rosdistro@@78c7db824f6d606b2efb6181cdaeae4494daf885
+    git+https://github.com/rep159-testing/rosdistro@@bc0600f8d3cdbd1d8ed03b436fb7d2592a7f550b
 @[if os_name == 'ubuntu' and os_code_name == 'yakkety']@
 @# git-buildpackage in Yakkety has a bug resulting in using the current time for
 @# the to be archived files resulting in non-deterministic checksums for the tarball

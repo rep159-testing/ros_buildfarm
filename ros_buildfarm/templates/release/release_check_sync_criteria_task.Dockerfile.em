@@ -43,14 +43,14 @@ RUN echo "@today_str"
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y python3-rosdistro-modules python3-yaml
 
 # REP-159 test: shadow the apt rosdistro module with the rep159-testing
-# rosdistro fork, branch rep159-child-ros-workspace. It parses distribution
-# file version 3 and lets a binary_import child release its own
-# ros_workspace. pip installs under /usr/local, which precedes
-# /usr/lib/python3/dist-packages on sys.path. This task image is focal: its
+# rosdistro fork, branch rep159-workspace-package. It parses distribution
+# file version 3 and reads a distribution's workspace_package, the package
+# a binary_import child may release itself. pip installs under /usr/local,
+# which precedes /usr/lib/python3/dist-packages on sys.path. This task image is focal: its
 # pip 20 does not know --break-system-packages, so it installs the commit
 # (full SHA) from GitHub's archive.
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y --no-install-recommends python3-pip
-RUN pip3 install --no-deps https://github.com/rep159-testing/rosdistro/archive/78c7db824f6d606b2efb6181cdaeae4494daf885.tar.gz
+RUN pip3 install --no-deps https://github.com/rep159-testing/rosdistro/archive/bc0600f8d3cdbd1d8ed03b436fb7d2592a7f550b.tar.gz
 
 USER buildfarm
 ENTRYPOINT ["sh", "-c"]
