@@ -358,7 +358,10 @@ def _get_and_parse_distribution_cache(
     from catkin_pkg.package import parse_package_string
     from catkin_pkg.package import Dependency
     dist_cache = get_distribution_cache(index, rosdistro_name)
-    pkg_names = set(['ros_workspace']).union(pkg_names)
+    # REP 159: the package that installs the setup files of the prefix is
+    # 'workspace_package' of the distribution file, ros_workspace by default
+    workspace_package = get_workspace_package(dist_cache.distribution_file)
+    pkg_names = set([workspace_package]).union(pkg_names)
     cached_pkgs = {
         pkg_name: parse_package_string(pkg_xml)
         for pkg_name, pkg_xml in dist_cache.release_package_xmls.items()
@@ -375,23 +378,34 @@ def _get_and_parse_distribution_cache(
             if group_depend.evaluated_condition is not False:
                 group_depend.extract_group_members(cached_pkgs.values())
 
-    # for ROS 2 distributions bloom injects a dependency on ros_workspace
-    # into almost all packages (except its dependencies)
+    # for ROS 2 distributions bloom injects a dependency on the workspace
+    # package into almost all packages (except its dependencies)
     # therefore the same dependency needs to to be injected here
     distribution_type = index.distributions[rosdistro_name].get(
         'distribution_type')
-    if distribution_type == 'ros2' and 'ros_workspace' in cached_pkgs:
-        no_ros_workspace_dep = set(['ros_workspace']).union(
+    if distribution_type == 'ros2' and workspace_package in cached_pkgs:
+        no_workspace_dep = set([workspace_package]).union(
             get_direct_dependencies(
-                'ros_workspace', cached_pkgs, pkg_names,
+                workspace_package, cached_pkgs, pkg_names,
                 include_test_deps=include_test_deps,
                 include_group_deps=include_group_deps))
 
         for pkg_name, pkg in cached_pkgs.items():
-            if pkg_name not in no_ros_workspace_dep:
-                pkg.exec_depends.append(Dependency('ros_workspace'))
+            if pkg_name not in no_workspace_dep:
+                pkg.exec_depends.append(Dependency(workspace_package))
 
     return cached_pkgs
+
+
+def get_workspace_package(distribution_file):
+    """Return the package that installs the setup files of the prefix.
+
+    REP 159: a distribution file may name it in 'workspace_package';
+    without it, or with a rosdistro that does not parse the field, it is
+    ros_workspace.
+    """
+    return getattr(distribution_file, 'workspace_package', None) or \
+        'ros_workspace'
 
 
 # Configure a Jenkins release job which consists of
