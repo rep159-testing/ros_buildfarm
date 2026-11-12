@@ -34,6 +34,7 @@ from ros_buildfarm.common import get_release_source_view_name
 from ros_buildfarm.common import get_release_view_name
 from ros_buildfarm.common \
     import get_repositories_and_script_generating_key_files
+from ros_buildfarm.common import get_short_build_name
 from ros_buildfarm.common import get_sourcedeb_job_name
 from ros_buildfarm.common import get_system_architecture
 from ros_buildfarm.common import JobValidationError
@@ -268,7 +269,9 @@ def configure_release_jobs(
                 binary_view = get_release_binary_view_name(
                     rosdistro_name, release_build_name,
                     os_name, os_code_name, arch)
-                binary_job_prefix = '%s__' % binary_view
+                short_build = get_short_build_name(release_build_name) if release_build_name else ''
+                ext_prefix = '%s_' % short_build if short_build.startswith('ext') else ''
+                binary_job_prefix = '%s__%s' % (binary_view, ext_prefix)
 
                 excluded_job_names = set([
                     j for j in all_binary_job_names
@@ -324,7 +327,9 @@ def configure_release_jobs(
 
             source_view_prefix = get_release_source_view_name(
                 rosdistro_name, os_name, os_code_name)
-            source_job_prefix = '%s__' % source_view_prefix
+            short_build = get_short_build_name(release_build_name) if release_build_name else ''
+            ext_prefix = '%s_' % short_build if short_build.startswith('ext') else ''
+            source_job_prefix = '%s__%s' % (source_view_prefix, ext_prefix)
             excluded_job_names = set([
                 j for j in (all_source_job_names + other_source_job_names)
                 if j.startswith(source_job_prefix)])
