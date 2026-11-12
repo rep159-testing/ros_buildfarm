@@ -42,7 +42,7 @@ RUN echo "@today_str"
 
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y git python3-pip python3-rosdistro-modules python3-yaml
 RUN pip3 install --break-system-packages --no-deps \
-    https://github.com/rep159-testing/rosdistro/archive/a8f5543.tar.gz
+    https://github.com/rep159-testing/rosdistro/archive/5d4a392.tar.gz
 
 
 USER buildfarm

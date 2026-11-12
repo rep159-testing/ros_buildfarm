@@ -67,7 +67,7 @@ RUN echo "@today_str"
 
 RUN python3 -u /tmp/wrapper_scripts/apt.py update-install-clean -q -y devscripts dpkg-dev git python3-apt python3-catkin-pkg-modules python3-empy python3-rosdistro-modules python3-yaml python3-pip
 RUN pip3 install --break-system-packages --no-deps \
-    https://github.com/rep159-testing/rosdistro/archive/a8f5543.tar.gz \
+    https://github.com/rep159-testing/rosdistro/archive/5d4a392.tar.gz \
     https://github.com/rep159-testing/rosdep/archive/3d52dadcbe13.tar.gz
 
 
