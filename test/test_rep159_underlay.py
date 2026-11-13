@@ -172,4 +172,4 @@ def test_call_build_tool_exports_cmake_prefix_path_with_setup_sh(tmp_path, monke
     assert rc == 0
     assert str(parent_space) in captured['env'].get('CMAKE_PREFIX_PATH', '')
     assert ('export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}"' % parent_space) in captured['cmd']
-    assert ('. %s' % setup_sh) in captured['cmd']
+    assert ('. %s && unset AMENT_CURRENT_PREFIX' % setup_sh) in captured['cmd']
