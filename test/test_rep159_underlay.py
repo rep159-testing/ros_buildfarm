@@ -140,3 +140,36 @@ def test_chained_binary_import_underlays():
         assert underlays == ['/opt/ros/upstream', '/opt/ros/binext']
     finally:
         rosdistro.get_distribution_file = orig_get_dist_file
+
+
+def test_call_build_tool_exports_cmake_prefix_path_with_setup_sh(tmp_path, monkeypatch):
+    from ros_buildfarm.workspace import call_build_tool
+    import subprocess
+
+    ws_root = tmp_path / 'ws'
+    (ws_root / 'src').mkdir(parents=True)
+    parent_space = tmp_path / 'opt_ros_jetty'
+    parent_space.mkdir()
+    setup_sh = parent_space / 'setup.sh'
+    setup_sh.write_text('# mock setup.sh\n')
+
+    captured = {}
+
+    def fake_call(cmd, cwd=None, shell=False, stderr=None, env=None):
+        captured['cmd'] = cmd
+        captured['env'] = dict(env or {})
+        return 0
+
+    monkeypatch.setattr(subprocess, 'call', fake_call)
+    env = {}
+    rc = call_build_tool(
+        'colcon',
+        'extendablelyrical',
+        str(ws_root),
+        parent_result_spaces=[str(parent_space)],
+        env=env,
+    )
+    assert rc == 0
+    assert str(parent_space) in captured['env'].get('CMAKE_PREFIX_PATH', '')
+    assert ('export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}"' % parent_space) in captured['cmd']
+    assert ('. %s' % setup_sh) in captured['cmd']

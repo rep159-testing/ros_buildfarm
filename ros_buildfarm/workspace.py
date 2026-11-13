@@ -146,6 +146,11 @@ def call_build_tool(
     for parent_result_space in reversed(parent_result_spaces):
         setup_file = os.path.join(parent_result_space, 'setup.sh')
         if os.path.exists(setup_file):
+            if env is not None:
+                curr_cpp = env.get('CMAKE_PREFIX_PATH', '')
+                env['CMAKE_PREFIX_PATH'] = (
+                    '%s:%s' % (parent_result_space, curr_cpp)
+                    if curr_cpp else parent_result_space)
             cmd = '. %s && %s' % (setup_file, cmd)
             if os.path.isfile(
                 os.path.join(parent_result_space, '.catkin')
@@ -155,6 +160,8 @@ def call_build_tool(
                 os.path.join(parent_result_space, '.colcon_install_layout')
             ):
                 cmd = 'COLCON_CURRENT_PREFIX=%s %s' % (parent_result_space, cmd)
+            cmd = 'export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}" && %s' % (
+                parent_result_space, cmd)
         elif os.path.exists(parent_result_space):
             curr_cpp = env.get('CMAKE_PREFIX_PATH', '')
             env['CMAKE_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_cpp) if curr_cpp else parent_result_space
