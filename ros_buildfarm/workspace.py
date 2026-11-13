@@ -151,7 +151,7 @@ def call_build_tool(
                 env['CMAKE_PREFIX_PATH'] = (
                     '%s:%s' % (parent_result_space, curr_cpp)
                     if curr_cpp else parent_result_space)
-            cmd = '. %s && %s' % (setup_file, cmd)
+            cmd = '. %s && unset AMENT_CURRENT_PREFIX && %s' % (setup_file, cmd)
             if os.path.isfile(
                 os.path.join(parent_result_space, '.catkin')
             ):
