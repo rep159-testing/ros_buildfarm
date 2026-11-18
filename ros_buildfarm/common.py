@@ -274,17 +274,15 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
             parent_distro = ext['distro_name']
 
             # Recursively gather ancestor underlays from parent distributions
+            p_dist_file = None
             if index and hasattr(index, 'distributions') and parent_distro in index.distributions:
-                try:
-                    from rosdistro import get_distribution_file
-                    p_dist_file = get_distribution_file(index, parent_distro)
-                    ancestor_underlays = get_binary_import_underlays(
-                        p_dist_file, index=index, _visited=_visited)
-                    for anc in ancestor_underlays:
-                        if anc not in underlays:
-                            underlays.append(anc)
-                except Exception:
-                    pass
+                from rosdistro import get_distribution_file
+                p_dist_file = get_distribution_file(index, parent_distro)
+                ancestor_underlays = get_binary_import_underlays(
+                    p_dist_file, index=index, _visited=_visited)
+                for anc in ancestor_underlays:
+                    if anc not in underlays:
+                        underlays.append(anc)
 
             parent_prefix = None
             if 'install_rule' in ext:
@@ -298,14 +296,8 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
                         rule['search'],
                         rule['replace'].replace('{distro}', clean_parent),
                         clean_parent)
-            if not parent_prefix and index and hasattr(index, 'distributions') and parent_distro in index.distributions:
-                try:
-                    from rosdistro import get_distribution_file
-                    p_dist_file = get_distribution_file(index, parent_distro)
-                    if hasattr(p_dist_file, 'get_install_prefix'):
-                        parent_prefix = p_dist_file.get_install_prefix()
-                except Exception:
-                    pass
+            if not parent_prefix and p_dist_file is not None and hasattr(p_dist_file, 'get_install_prefix'):
+                parent_prefix = p_dist_file.get_install_prefix()
             if not parent_prefix:
                 parent_prefix = '/opt/ros/%s' % parent_distro
             if parent_prefix not in underlays:
