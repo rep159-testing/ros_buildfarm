@@ -173,3 +173,57 @@ def test_call_build_tool_exports_cmake_prefix_path_with_setup_sh(tmp_path, monke
     assert str(parent_space) in captured['env'].get('CMAKE_PREFIX_PATH', '')
     assert ('export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}"' % parent_space) in captured['cmd']
     assert ('. %s && unset AMENT_CURRENT_PREFIX' % setup_sh) in captured['cmd']
+
+
+def test_underlay_propagates_parent_distribution_load_error(monkeypatch):
+    import pytest
+    import rosdistro
+
+    class _MockIndex:
+
+        def __init__(self, distros):
+            self.distributions = distros
+
+    child = _DistFile('binext', extends=[
+        {'distro_name': 'broken_parent', 'extension_method': 'binary_import'}
+    ])
+
+    def _boom(idx, name):
+        raise RuntimeError('Failed to load distribution file for %s' % name)
+
+    monkeypatch.setattr(rosdistro, 'get_distribution_file', _boom)
+    index = _MockIndex({'broken_parent': object()})
+    with pytest.raises(RuntimeError, match='broken_parent'):
+        get_binary_import_underlays(child, index=index)
+
+
+def test_ci_job_propagates_distribution_file_load_error(monkeypatch):
+    import pytest
+    from ros_buildfarm import ci_job
+
+    class _MockIndex:
+
+        def __init__(self):
+            self.distributions = {'broken_distro': {'distribution_type': 'ros2'}}
+
+    class _MockBuildFile:
+        build_environment_variables = {}
+        repository_urls = []
+        repository_keys = []
+
+    monkeypatch.setattr(
+        ci_job,
+        'get_repositories_and_script_generating_key_files',
+        lambda build_file=None: ([], []),
+    )
+
+    def _boom(idx, name):
+        raise RuntimeError('Cannot load %s' % name)
+
+    monkeypatch.setattr(ci_job, 'get_distribution_file', _boom)
+    with pytest.raises(RuntimeError, match='Cannot load broken_distro'):
+        ci_job._get_ci_job_config(
+            _MockIndex(), 'broken_distro', _MockBuildFile(),
+            'ubuntu', 'resolute', 'amd64',
+            [], [], [], False, [], [], None, [],
+        )
