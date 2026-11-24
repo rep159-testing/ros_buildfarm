@@ -285,7 +285,7 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
                         underlays.append(anc)
 
             parent_prefix = None
-            if 'install_rule' in ext:
+            if ext.get('install_rule'):
                 rule = ext['install_rule']
                 if isinstance(rule, str):
                     parent_prefix = rule.replace('{distro}', parent_distro)
