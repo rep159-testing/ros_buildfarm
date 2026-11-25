@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from shlex import quote
 import shutil
 import subprocess
 
@@ -144,6 +145,8 @@ def call_build_tool(
     if parent_result_spaces is None:
         parent_result_spaces = get_default_parent_result_spaces(rosdistro_name)
     for parent_result_space in reversed(parent_result_spaces):
+        # quote every path that goes into the shell command
+        quoted_space = quote(parent_result_space)
         setup_file = os.path.join(parent_result_space, 'setup.sh')
         if os.path.exists(setup_file):
             if env is not None:
@@ -151,17 +154,18 @@ def call_build_tool(
                 env['CMAKE_PREFIX_PATH'] = (
                     '%s:%s' % (parent_result_space, curr_cpp)
                     if curr_cpp else parent_result_space)
-            cmd = '. %s && unset AMENT_CURRENT_PREFIX && %s' % (setup_file, cmd)
+            cmd = '. %s && unset AMENT_CURRENT_PREFIX && %s' % (
+                quote(setup_file), cmd)
             if os.path.isfile(
                 os.path.join(parent_result_space, '.catkin')
             ):
-                cmd = '_CATKIN_SETUP_DIR=%s %s' % (parent_result_space, cmd)
+                cmd = '_CATKIN_SETUP_DIR=%s %s' % (quoted_space, cmd)
             if os.path.isfile(
                 os.path.join(parent_result_space, '.colcon_install_layout')
             ):
-                cmd = 'COLCON_CURRENT_PREFIX=%s %s' % (parent_result_space, cmd)
-            cmd = 'export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}" && %s' % (
-                parent_result_space, cmd)
+                cmd = 'COLCON_CURRENT_PREFIX=%s %s' % (quoted_space, cmd)
+            cmd = 'export CMAKE_PREFIX_PATH=%s:"${CMAKE_PREFIX_PATH}" && %s' % (
+                quoted_space, cmd)
         elif os.path.exists(parent_result_space):
             curr_cpp = env.get('CMAKE_PREFIX_PATH', '')
             env['CMAKE_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_cpp) if curr_cpp else parent_result_space
@@ -183,10 +187,10 @@ def call_build_tool(
             if os.path.isdir(bin_dir):
                 env['PATH'] = '%s:%s' % (bin_dir, curr_path) if curr_path else bin_dir
             cmd = (
-                'export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}" && '
-                'export COLCON_PREFIX_PATH="%s:${COLCON_PREFIX_PATH}" && '
-                'export LD_LIBRARY_PATH="%s:${LD_LIBRARY_PATH}" && %s'
-            ) % (parent_result_space, parent_result_space, lib_str, cmd)
+                'export CMAKE_PREFIX_PATH=%s:"${CMAKE_PREFIX_PATH}" && '
+                'export COLCON_PREFIX_PATH=%s:"${COLCON_PREFIX_PATH}" && '
+                'export LD_LIBRARY_PATH=%s:"${LD_LIBRARY_PATH}" && %s'
+            ) % (quoted_space, quoted_space, quote(lib_str), cmd)
 
     # prevent colcon from crawling the catkin results
     if build_tool != 'colcon':

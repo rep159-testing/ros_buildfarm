@@ -15,6 +15,7 @@
 from collections import namedtuple
 import os
 import platform
+import re
 try:
     from urllib.parse import urlparse
 except ImportError:
@@ -196,14 +197,55 @@ def get_ci_view_name(rosdistro_name):
     return view_name
 
 
+# REP 159: binary_rule and install_rule are free-form text from distribution
+# files, and what they give ends up in shell commands of the generated jobs
+# and build containers. Accept only names made of the characters a Debian or
+# RPM package name may hold, and plain absolute paths.
+_OS_PACKAGE_NAME_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9.+-]*')
+_INSTALL_PREFIX_PATTERN = re.compile(r'(/[A-Za-z0-9_+-][A-Za-z0-9._+-]*)+')
+
+
+def check_os_package_name(name, what='OS package name'):
+    """
+    Return name if it is a valid OS package name (or name prefix).
+
+    Raise ValueError otherwise, for example for an empty name or one with
+    characters a shell would interpret.
+    """
+    if not isinstance(name, str) or \
+            not _OS_PACKAGE_NAME_PATTERN.fullmatch(name):
+        raise ValueError(
+            "Invalid %s %r: it must start with a letter or digit and "
+            "contain only letters, digits, '.', '+' and '-'" % (what, name))
+    return name
+
+
+def check_install_prefix(prefix):
+    """
+    Return prefix if it is a plain absolute path.
+
+    Raise ValueError otherwise: the path must start with '/', and each of its
+    components must be made of letters, digits, '.', '_', '+' and '-' and
+    must not start with '.' (which also rules out '.' and '..').
+    """
+    if not isinstance(prefix, str) or \
+            not _INSTALL_PREFIX_PATTERN.fullmatch(prefix):
+        raise ValueError(
+            "Invalid install prefix %r: it must be an absolute path whose "
+            "components contain only letters, digits, '.', '_', '+' and '-' "
+            "and do not start with '.'" % (prefix,))
+    return prefix
+
+
 def get_os_package_name_prefix(rosdistro_name, dist_file=None):
     clean_distro = rosdistro_name.replace('_', '-') if rosdistro_name else ''
+    prefix = 'ros-%s-' % clean_distro
     if dist_file and hasattr(dist_file, 'binary_rule') and dist_file.binary_rule:
         rule = dist_file.binary_rule
         if isinstance(rule, dict) and rule.get('search') == '^':
             prefix = rule.get('replace', '').replace('{distro}', clean_distro)
-            return prefix.replace('_', '-')
-    return 'ros-%s-' % clean_distro
+            prefix = prefix.replace('_', '-')
+    return check_os_package_name(prefix, what='OS package name prefix')
 
 
 def get_os_package_name(rosdistro_name, ros_package_name, dist_file=None):
@@ -215,12 +257,13 @@ def get_os_package_name(rosdistro_name, ros_package_name, dist_file=None):
     exact package overrides). Otherwise falls back to 'ros-<distro>-<pkg>'.
     """
     if dist_file and hasattr(dist_file, 'get_binary_package_name'):
-        return dist_file.get_binary_package_name(ros_package_name)
+        return check_os_package_name(
+            dist_file.get_binary_package_name(ros_package_name))
     clean_distro = rosdistro_name.replace('_', '-') if rosdistro_name else ''
     clean_pkg = ros_package_name.replace('_', '-')
-    return '%s%s' % \
-        (get_os_package_name_prefix(clean_distro, dist_file=dist_file),
-         clean_pkg)
+    return check_os_package_name('%s%s' % (
+        get_os_package_name_prefix(clean_distro, dist_file=dist_file),
+        clean_pkg))
 
 
 PARENT_RESULT_SPACES_ENV = 'ROS_BUILDFARM_PARENT_RESULT_SPACES'
@@ -246,9 +289,10 @@ def get_distribution_install_prefix(dist_file, pkg_name=None):
     otherwise falls back to /opt/ros/<distro_name>.
     """
     if hasattr(dist_file, 'get_install_prefix'):
-        return dist_file.get_install_prefix(pkg_name)
+        return check_install_prefix(dist_file.get_install_prefix(pkg_name))
     clean_distro = getattr(dist_file, 'name', '').replace('_', '-')
-    return '/opt/ros/%s' % clean_distro if clean_distro else '/usr'
+    return check_install_prefix(
+        '/opt/ros/%s' % clean_distro if clean_distro else '/usr')
 
 
 def get_binary_import_underlays(dist_file, index=None, _visited=None):
@@ -300,6 +344,7 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
                 parent_prefix = p_dist_file.get_install_prefix()
             if not parent_prefix:
                 parent_prefix = '/opt/ros/%s' % parent_distro
+            check_install_prefix(parent_prefix)
             if parent_prefix not in underlays:
                 underlays.append(parent_prefix)
     return underlays
@@ -323,18 +368,20 @@ def get_default_parent_result_spaces(rosdistro_name, environ=None, dist_file=Non
         if p
     ]
     if explicit_spaces:
-        return explicit_spaces
+        return [check_install_prefix(p) for p in explicit_spaces]
 
     target_prefix = '/opt/ros/%s' % rosdistro_name
     if dist_file and hasattr(dist_file, 'get_install_prefix'):
-        target_prefix = dist_file.get_install_prefix()
+        target_prefix = check_install_prefix(dist_file.get_install_prefix())
 
     legacy_parents = [
         name for name in environ.get(BINARY_IMPORT_DISTROS_ENV, '').split(':')
         if name
     ]
     if legacy_parents:
-        return ['/opt/ros/%s' % name for name in legacy_parents] + [target_prefix]
+        return [
+            check_install_prefix('/opt/ros/%s' % name)
+            for name in legacy_parents] + [target_prefix]
 
     if dist_file:
         parent_underlays = get_binary_import_underlays(dist_file)
