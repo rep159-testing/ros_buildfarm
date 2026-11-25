@@ -228,9 +228,7 @@ BINARY_IMPORT_DISTROS_ENV = 'ROS_BUILDFARM_BINARY_IMPORT_DISTROS'
 
 
 def get_binary_import_distros(dist_file):
-    """
-    Return the distributions a distribution extends with binary_import.
-    """
+    """Return the distributions a distribution extends with binary_import."""
     return [
         ext['distro_name']
         for ext in getattr(dist_file, 'extends', None) or []
@@ -296,7 +294,10 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
                         rule['search'],
                         rule['replace'].replace('{distro}', clean_parent),
                         clean_parent)
-            if not parent_prefix and p_dist_file is not None and hasattr(p_dist_file, 'get_install_prefix'):
+            if (
+                not parent_prefix and p_dist_file is not None and
+                hasattr(p_dist_file, 'get_install_prefix')
+            ):
                 parent_prefix = p_dist_file.get_install_prefix()
             if not parent_prefix:
                 parent_prefix = '/opt/ros/%s' % parent_distro

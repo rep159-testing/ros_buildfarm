@@ -164,9 +164,13 @@ def call_build_tool(
                 parent_result_space, cmd)
         elif os.path.exists(parent_result_space):
             curr_cpp = env.get('CMAKE_PREFIX_PATH', '')
-            env['CMAKE_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_cpp) if curr_cpp else parent_result_space
+            env['CMAKE_PREFIX_PATH'] = (
+                '%s:%s' % (parent_result_space, curr_cpp)
+                if curr_cpp else parent_result_space)
             curr_colcon = env.get('COLCON_PREFIX_PATH', '')
-            env['COLCON_PREFIX_PATH'] = '%s:%s' % (parent_result_space, curr_colcon) if curr_colcon else parent_result_space
+            env['COLCON_PREFIX_PATH'] = (
+                '%s:%s' % (parent_result_space, curr_colcon)
+                if curr_colcon else parent_result_space)
             lib_dirs = [
                 os.path.join(parent_result_space, 'lib'),
                 os.path.join(parent_result_space, 'lib', 'x86_64-linux-gnu'),

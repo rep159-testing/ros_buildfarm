@@ -118,6 +118,7 @@ def test_dist_file_custom_prefix_resolution():
 
 def test_chained_binary_import_underlays():
     class _MockIndex:
+
         def __init__(self, distros):
             self.distributions = distros
 
