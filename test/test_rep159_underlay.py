@@ -14,6 +14,7 @@
 
 from ros_buildfarm.common import BINARY_IMPORT_DISTROS_ENV
 from ros_buildfarm.common import get_binary_import_underlays
+from ros_buildfarm.common import get_ci_parent_result_spaces
 from ros_buildfarm.common import get_default_parent_result_spaces
 from ros_buildfarm.common import get_distribution_install_prefix
 from ros_buildfarm.common import PARENT_RESULT_SPACES_ENV
@@ -107,6 +108,51 @@ def test_explicit_parent_result_spaces_take_precedence():
     }
     assert get_default_parent_result_spaces('binext', environ=environ) == \
         ['/opt/acme/upstream', '/opt/custom/lyrical']
+
+
+def test_empty_entries_are_ignored():
+    environ = {BINARY_IMPORT_DISTROS_ENV: ':lyrical::jetty:'}
+    assert get_default_parent_result_spaces('binext', environ=environ) == \
+        ['/opt/ros/lyrical', '/opt/ros/jetty', '/opt/ros/binext']
+    environ = {PARENT_RESULT_SPACES_ENV: ':/opt/ros/lyrical::/opt/ros/binext:'}
+    assert get_default_parent_result_spaces('binext', environ=environ) == \
+        ['/opt/ros/lyrical', '/opt/ros/binext']
+
+
+def test_ci_spaces_end_with_the_distributions_own_prefix():
+    dist_file = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import'},
+    ])
+    spaces = get_ci_parent_result_spaces(dist_file)
+    assert spaces == ['/opt/ros/upstream', '/opt/ros/binext']
+    # What the job generator writes is what the build containers source.
+    environ = {PARENT_RESULT_SPACES_ENV: ':'.join(spaces)}
+    assert get_default_parent_result_spaces('binext', environ=environ) == \
+        spaces
+
+
+def test_ci_spaces_own_prefix_follows_its_install_rule():
+    dist_file = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import'},
+    ], install_rule='/opt/acme/{distro}')
+    assert get_ci_parent_result_spaces(dist_file) == \
+        ['/opt/ros/upstream', '/opt/acme/binext']
+
+
+def test_ci_spaces_own_prefix_is_not_repeated():
+    dist_file = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import',
+         'install_rule': '/opt/shared'},
+    ], install_rule='/opt/shared')
+    assert get_ci_parent_result_spaces(dist_file) == ['/opt/shared']
+
+
+def test_ci_spaces_without_binary_import_parents_are_empty():
+    assert get_ci_parent_result_spaces(_DistFile('upstream')) == []
+    dist_file = _DistFile('srcext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'source_rebuild'},
+    ])
+    assert get_ci_parent_result_spaces(dist_file) == []
 
 
 def test_dist_file_custom_prefix_resolution():

@@ -19,8 +19,8 @@ import sys
 
 from ros_buildfarm.common import BINARY_IMPORT_DISTROS_ENV
 from ros_buildfarm.common import get_binary_import_distros
-from ros_buildfarm.common import get_binary_import_underlays
 from ros_buildfarm.common import get_ci_job_name
+from ros_buildfarm.common import get_ci_parent_result_spaces
 from ros_buildfarm.common import get_ci_view_name
 from ros_buildfarm.common import get_default_node_label
 from ros_buildfarm.common import get_node_label
@@ -264,12 +264,14 @@ def _get_ci_job_config(
             .get('distribution_type', 'ros1')
         assert distribution_type in ('ros1', 'ros2')
         # REP 159: packages of binary_import parents are installed under
-        # custom prefixes (or /opt/ros/<parent>); tell the build containers to source them.
+        # custom prefixes (or /opt/ros/<parent>); tell the build containers
+        # to source them, then the distribution's own prefix.
         dist_file = get_distribution_file(index, rosdistro_name)
-        underlays = get_binary_import_underlays(dist_file, index=index)
-        if underlays:
+        parent_result_spaces = get_ci_parent_result_spaces(
+            dist_file, index=index)
+        if parent_result_spaces:
             build_environment_variables.append('%s=%s' % (
-                PARENT_RESULT_SPACES_ENV, ':'.join(underlays)))
+                PARENT_RESULT_SPACES_ENV, ':'.join(parent_result_spaces)))
             parents = get_binary_import_distros(dist_file)
             if parents:
                 build_environment_variables.append('%s=%s' % (

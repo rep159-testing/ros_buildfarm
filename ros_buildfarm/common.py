@@ -305,6 +305,24 @@ def get_binary_import_underlays(dist_file, index=None, _visited=None):
     return underlays
 
 
+def get_ci_parent_result_spaces(dist_file, index=None):
+    """
+    Return the prefixes a CI job of dist_file sources, in sourcing order.
+
+    REP 159: the install prefixes of the binary_import ancestors come first,
+    then the distribution's own prefix, which holds the packages of this
+    distribution installed as binaries, such as its workspace package.
+    A distribution without binary_import parents gives an empty list: the
+    build containers then keep their default, /opt/ros/<rosdistro_name>.
+    """
+    spaces = get_binary_import_underlays(dist_file, index=index)
+    if spaces:
+        own_prefix = get_distribution_install_prefix(dist_file)
+        if own_prefix not in spaces:
+            spaces.append(own_prefix)
+    return spaces
+
+
 def get_default_parent_result_spaces(rosdistro_name, environ=None, dist_file=None):
     """
     Return the prefixes to source before building for a rosdistro.
