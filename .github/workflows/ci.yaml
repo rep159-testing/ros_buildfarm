@@ -16,6 +16,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U -e .[test]
+      - name: Install the REP 159 rosdistro
+        # The REP 159 tests load distribution format 3, which the rosdistro
+        # from PyPI cannot read. The REP 159 one reports the same version, so
+        # check that it is the one installed.
+        run: |
+          python -m pip install --force-reinstall --no-deps git+https://github.com/rep159-testing/rosdistro.git@rep159
+          python -c "from rosdistro.distribution_file import DistributionFile; assert hasattr(DistributionFile, 'merge_extends')"
       - name: Run tests
         run: |
           python -m pytest -s test
