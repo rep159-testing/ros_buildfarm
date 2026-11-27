@@ -92,6 +92,12 @@ def add_argument_package_name(parser):
         help="The name of the 'package' from the distribution file")
 
 
+def add_argument_debian_package_name(parser):
+    parser.add_argument(
+        '--debian-package-name',
+        help='The debian package name (optional)')
+
+
 def add_argument_os_name(parser):
     parser.add_argument(
         'os_name',

@@ -13,26 +13,41 @@
 # limitations under the License.
 
 from ros_buildfarm.common import BINARY_IMPORT_DISTROS_ENV
-from ros_buildfarm.common import get_binary_import_distros
+from ros_buildfarm.common import get_binary_import_underlays
+from ros_buildfarm.common import get_ci_parent_result_spaces
 from ros_buildfarm.common import get_default_parent_result_spaces
+from ros_buildfarm.common import get_distribution_install_prefix
+from ros_buildfarm.common import PARENT_RESULT_SPACES_ENV
 
 
 class _DistFile:
 
-    def __init__(self, extends):  # noqa: D107
-        self.extends = extends
+    def __init__(self, name='test_distro', extends=None, install_rule=None):
+        self.name = name
+        self.extends = extends or []
+        self.install_rule = install_rule
+
+    def get_install_prefix(self, pkg_name=None):
+        if not self.install_rule:
+            return '/opt/ros/%s' % self.name
+        if isinstance(self.install_rule, str):
+            return self.install_rule.replace('{distro}', self.name)
+        if isinstance(self.install_rule, dict):
+            import re
+            return re.sub(self.install_rule['search'], self.install_rule['replace'].replace('{distro}', self.name), pkg_name or '')
+        return '/opt/ros/%s' % self.name
 
 
-def test_no_extends_attribute_means_no_parents():
-    assert get_binary_import_distros(object()) == []
+def test_no_extends_attribute_means_no_underlays():
+    assert get_binary_import_underlays(object()) == []
 
 
-def test_empty_extends_means_no_parents():
-    assert get_binary_import_distros(_DistFile([])) == []
+def test_empty_extends_means_no_underlays():
+    assert get_binary_import_underlays(_DistFile('binext', [])) == []
 
 
 def test_only_binary_import_parents_in_order():
-    dist_file = _DistFile([
+    dist_file = _DistFile('binext', [
         {'distro_name': 'upstream', 'index_url': None,
          'extension_method': 'source_rebuild'},
         {'distro_name': 'lyrical', 'index_url': 'https://example.org/i.yaml',
@@ -40,7 +55,39 @@ def test_only_binary_import_parents_in_order():
         {'distro_name': 'jetty', 'index_url': None,
          'extension_method': 'binary_import'},
     ])
-    assert get_binary_import_distros(dist_file) == ['lyrical', 'jetty']
+    assert get_binary_import_underlays(dist_file) == [
+        '/opt/ros/lyrical',
+        '/opt/ros/jetty'
+    ]
+
+
+def test_custom_install_rule_in_extends_string_template():
+    dist_file = _DistFile('binext', [
+        {'distro_name': 'gazebo',
+         'extension_method': 'binary_import',
+         'install_rule': '/usr'},
+        {'distro_name': 'acme',
+         'extension_method': 'binary_import',
+         'install_rule': '/opt/acme/{distro}'},
+    ])
+    assert get_binary_import_underlays(dist_file) == [
+        '/usr',
+        '/opt/acme/acme'
+    ]
+
+
+def test_custom_install_rule_in_extends_regex():
+    dist_file = _DistFile('binext', [
+        {'distro_name': 'vendor_v1',
+         'extension_method': 'binary_import',
+         'install_rule': {
+             'search': '^.*$',
+             'replace': '/opt/vendor/{distro}'
+         }},
+    ])
+    assert get_binary_import_underlays(dist_file) == [
+        '/opt/vendor/vendor-v1'
+    ]
 
 
 def test_default_parent_spaces_without_the_variable():
@@ -48,13 +95,182 @@ def test_default_parent_spaces_without_the_variable():
         ['/opt/ros/binext']
 
 
-def test_binary_import_parents_come_first():
+def test_legacy_binary_import_parents_come_first():
     environ = {BINARY_IMPORT_DISTROS_ENV: 'lyrical'}
     assert get_default_parent_result_spaces('binext', environ=environ) == \
         ['/opt/ros/lyrical', '/opt/ros/binext']
+
+
+def test_explicit_parent_result_spaces_take_precedence():
+    environ = {
+        PARENT_RESULT_SPACES_ENV: '/opt/acme/upstream:/opt/custom/lyrical',
+        BINARY_IMPORT_DISTROS_ENV: 'legacy_distro'
+    }
+    assert get_default_parent_result_spaces('binext', environ=environ) == \
+        ['/opt/acme/upstream', '/opt/custom/lyrical']
 
 
 def test_empty_entries_are_ignored():
     environ = {BINARY_IMPORT_DISTROS_ENV: ':lyrical::jetty:'}
     assert get_default_parent_result_spaces('binext', environ=environ) == \
         ['/opt/ros/lyrical', '/opt/ros/jetty', '/opt/ros/binext']
+    environ = {PARENT_RESULT_SPACES_ENV: ':/opt/ros/lyrical::/opt/ros/binext:'}
+    assert get_default_parent_result_spaces('binext', environ=environ) == \
+        ['/opt/ros/lyrical', '/opt/ros/binext']
+
+
+def test_ci_spaces_end_with_the_distributions_own_prefix():
+    dist_file = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import'},
+    ])
+    spaces = get_ci_parent_result_spaces(dist_file)
+    assert spaces == ['/opt/ros/upstream', '/opt/ros/binext']
+    # What the job generator writes is what the build containers source.
+    environ = {PARENT_RESULT_SPACES_ENV: ':'.join(spaces)}
+    assert get_default_parent_result_spaces('binext', environ=environ) == \
+        spaces
+
+
+def test_ci_spaces_own_prefix_follows_its_install_rule():
+    dist_file = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import'},
+    ], install_rule='/opt/acme/{distro}')
+    assert get_ci_parent_result_spaces(dist_file) == \
+        ['/opt/ros/upstream', '/opt/acme/binext']
+
+
+def test_ci_spaces_own_prefix_is_not_repeated():
+    dist_file = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import',
+         'install_rule': '/opt/shared'},
+    ], install_rule='/opt/shared')
+    assert get_ci_parent_result_spaces(dist_file) == ['/opt/shared']
+
+
+def test_ci_spaces_without_binary_import_parents_are_empty():
+    assert get_ci_parent_result_spaces(_DistFile('upstream')) == []
+    dist_file = _DistFile('srcext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'source_rebuild'},
+    ])
+    assert get_ci_parent_result_spaces(dist_file) == []
+
+
+def test_dist_file_custom_prefix_resolution():
+    dist_file = _DistFile('acme_distro', install_rule='/opt/acme/{distro}')
+    assert get_distribution_install_prefix(dist_file) == '/opt/acme/acme_distro'
+    assert get_default_parent_result_spaces('acme_distro', environ={}, dist_file=dist_file) == \
+        ['/opt/acme/acme_distro']
+
+
+def test_chained_binary_import_underlays():
+    class _MockIndex:
+
+        def __init__(self, distros):
+            self.distributions = distros
+
+    grandparent = _DistFile('upstream', extends=[])
+    parent = _DistFile('binext', extends=[
+        {'distro_name': 'upstream', 'extension_method': 'binary_import'}
+    ])
+    child = _DistFile('chainext', extends=[
+        {'distro_name': 'binext', 'extension_method': 'binary_import'}
+    ])
+
+    import rosdistro
+    orig_get_dist_file = rosdistro.get_distribution_file
+    try:
+        dist_map = {'upstream': grandparent, 'binext': parent, 'chainext': child}
+        rosdistro.get_distribution_file = lambda idx, name: dist_map[name]
+        index = _MockIndex(dist_map)
+
+        underlays = get_binary_import_underlays(child, index=index)
+        assert underlays == ['/opt/ros/upstream', '/opt/ros/binext']
+    finally:
+        rosdistro.get_distribution_file = orig_get_dist_file
+
+
+def test_call_build_tool_exports_cmake_prefix_path_with_setup_sh(tmp_path, monkeypatch):
+    from ros_buildfarm.workspace import call_build_tool
+    import subprocess
+
+    ws_root = tmp_path / 'ws'
+    (ws_root / 'src').mkdir(parents=True)
+    parent_space = tmp_path / 'opt_ros_jetty'
+    parent_space.mkdir()
+    setup_sh = parent_space / 'setup.sh'
+    setup_sh.write_text('# mock setup.sh\n')
+
+    captured = {}
+
+    def fake_call(cmd, cwd=None, shell=False, stderr=None, env=None):
+        captured['cmd'] = cmd
+        captured['env'] = dict(env or {})
+        return 0
+
+    monkeypatch.setattr(subprocess, 'call', fake_call)
+    env = {}
+    rc = call_build_tool(
+        'colcon',
+        'extendablelyrical',
+        str(ws_root),
+        parent_result_spaces=[str(parent_space)],
+        env=env,
+    )
+    assert rc == 0
+    assert str(parent_space) in captured['env'].get('CMAKE_PREFIX_PATH', '')
+    assert ('export CMAKE_PREFIX_PATH="%s:${CMAKE_PREFIX_PATH}"' % parent_space) in captured['cmd']
+    assert ('. %s && unset AMENT_CURRENT_PREFIX' % setup_sh) in captured['cmd']
+
+
+def test_underlay_propagates_parent_distribution_load_error(monkeypatch):
+    import pytest
+    import rosdistro
+
+    class _MockIndex:
+
+        def __init__(self, distros):
+            self.distributions = distros
+
+    child = _DistFile('binext', extends=[
+        {'distro_name': 'broken_parent', 'extension_method': 'binary_import'}
+    ])
+
+    def _boom(idx, name):
+        raise RuntimeError('Failed to load distribution file for %s' % name)
+
+    monkeypatch.setattr(rosdistro, 'get_distribution_file', _boom)
+    index = _MockIndex({'broken_parent': object()})
+    with pytest.raises(RuntimeError, match='broken_parent'):
+        get_binary_import_underlays(child, index=index)
+
+
+def test_ci_job_propagates_distribution_file_load_error(monkeypatch):
+    import pytest
+    from ros_buildfarm import ci_job
+
+    class _MockIndex:
+
+        def __init__(self):
+            self.distributions = {'broken_distro': {'distribution_type': 'ros2'}}
+
+    class _MockBuildFile:
+        build_environment_variables = {}
+        repository_urls = []
+        repository_keys = []
+
+    monkeypatch.setattr(
+        ci_job,
+        'get_repositories_and_script_generating_key_files',
+        lambda build_file=None: ([], []),
+    )
+
+    def _boom(idx, name):
+        raise RuntimeError('Cannot load %s' % name)
+
+    monkeypatch.setattr(ci_job, 'get_distribution_file', _boom)
+    with pytest.raises(RuntimeError, match='Cannot load broken_distro'):
+        ci_job._get_ci_job_config(
+            _MockIndex(), 'broken_distro', _MockBuildFile(),
+            'ubuntu', 'resolute', 'amd64',
+            [], [], [], False, [], [], None, [],
+        )

@@ -91,6 +91,7 @@ if append_timestamp:
     cmds.append(
         'PYTHONPATH=/tmp/ros_buildfarm:$PYTHONPATH python3 -u' +
         ' /tmp/ros_buildfarm/scripts/release/append_build_timestamp.py' +
+        ' --rosdistro-index-url ' + rosdistro_index_url +
         ' ' + rosdistro_name +
         ' ' + package_name +
         ' --sourcepkg-dir ' + binarypkg_dir)

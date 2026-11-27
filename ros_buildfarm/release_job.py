@@ -26,6 +26,7 @@ from ros_buildfarm.common import get_github_project_url
 from ros_buildfarm.common import get_implicitly_ignored_package_names
 from ros_buildfarm.common import get_node_label
 from ros_buildfarm.common import get_os_package_name
+from ros_buildfarm.common import get_os_package_name_prefix
 from ros_buildfarm.common import get_package_manifests
 from ros_buildfarm.common import get_release_binary_view_name
 from ros_buildfarm.common import get_release_job_prefix
@@ -195,6 +196,8 @@ def configure_release_jobs(
     all_source_job_names = []
     all_binary_job_names = []
     for pkg_name in [p.name for _, p in ordered_pkg_tuples]:
+        if pkg_name not in dist_file.release_packages:
+            continue
         if whitelist_package_names:
             if pkg_name not in whitelist_package_names:
                 print("Skipping package '%s' not in the explicitly passed list" %
@@ -355,7 +358,10 @@ def _get_and_parse_distribution_cache(
     from catkin_pkg.package import parse_package_string
     from catkin_pkg.package import Dependency
     dist_cache = get_distribution_cache(index, rosdistro_name)
-    pkg_names = set(['ros_workspace']).union(pkg_names)
+    # REP 159: the package that installs the setup files of the prefix is
+    # 'workspace_package' of the distribution file, ros_workspace by default
+    workspace_package = get_workspace_package(dist_cache.distribution_file)
+    pkg_names = set([workspace_package]).union(pkg_names)
     cached_pkgs = {
         pkg_name: parse_package_string(pkg_xml)
         for pkg_name, pkg_xml in dist_cache.release_package_xmls.items()
@@ -372,23 +378,34 @@ def _get_and_parse_distribution_cache(
             if group_depend.evaluated_condition is not False:
                 group_depend.extract_group_members(cached_pkgs.values())
 
-    # for ROS 2 distributions bloom injects a dependency on ros_workspace
-    # into almost all packages (except its dependencies)
+    # for ROS 2 distributions bloom injects a dependency on the workspace
+    # package into almost all packages (except its dependencies)
     # therefore the same dependency needs to to be injected here
     distribution_type = index.distributions[rosdistro_name].get(
         'distribution_type')
-    if distribution_type == 'ros2' and 'ros_workspace' in cached_pkgs:
-        no_ros_workspace_dep = set(['ros_workspace']).union(
+    if distribution_type == 'ros2' and workspace_package in cached_pkgs:
+        no_workspace_dep = set([workspace_package]).union(
             get_direct_dependencies(
-                'ros_workspace', cached_pkgs, pkg_names,
+                workspace_package, cached_pkgs, pkg_names,
                 include_test_deps=include_test_deps,
                 include_group_deps=include_group_deps))
 
         for pkg_name, pkg in cached_pkgs.items():
-            if pkg_name not in no_ros_workspace_dep:
-                pkg.exec_depends.append(Dependency('ros_workspace'))
+            if pkg_name not in no_workspace_dep:
+                pkg.exec_depends.append(Dependency(workspace_package))
 
     return cached_pkgs
+
+
+def get_workspace_package(distribution_file):
+    """Return the package that installs the setup files of the prefix.
+
+    REP 159: a distribution file may name it in 'workspace_package';
+    without it, or with a rosdistro that does not parse the field, it is
+    ros_workspace.
+    """
+    return getattr(distribution_file, 'workspace_package', None) or \
+        'ros_workspace'
 
 
 # Configure a Jenkins release job which consists of
@@ -526,7 +543,8 @@ def configure_release_job(
         config, build_file, os_name, os_code_name,
         pkg_name, repo_name, repo.release_repository, cached_pkgs=cached_pkgs,
         is_disabled=is_source_disabled,
-        other_build_files_same_platform=other_build_files_same_platform)
+        other_build_files_same_platform=other_build_files_same_platform,
+        dist_file=dist_file)
     # jenkinsapi.jenkins.Jenkins evaluates to false if job count is zero
     if isinstance(jenkins, object) and jenkins is not False:
         from ros_buildfarm.jenkins import configure_job
@@ -572,7 +590,8 @@ def configure_release_job(
             cached_pkgs=cached_pkgs, upstream_job_names=upstream_job_names,
             is_disabled=is_disabled,
             docker_base_image_override=docker_base_image_override,
-            skip_rosdep_keys=skip_rosdep_keys)
+            skip_rosdep_keys=skip_rosdep_keys,
+            dist_file=dist_file)
         # jenkinsapi.jenkins.Jenkins evaluates to false if job count is zero
         if isinstance(jenkins, object) and jenkins is not False:
             configure_job(jenkins, job_name, job_config, dry_run=dry_run)
@@ -608,7 +627,8 @@ def _get_sourcedeb_job_config(
         config_url, rosdistro_name, release_build_name,
         config, build_file, os_name, os_code_name,
         pkg_name, repo_name, release_repository, cached_pkgs=None,
-        is_disabled=False, other_build_files_same_platform=None):
+        is_disabled=False, other_build_files_same_platform=None,
+        dist_file=None):
     package_format = package_format_mapping[os_name]
     template_name = 'release/%s/sourcepkg_job.xml.em' % package_format
 
@@ -672,7 +692,7 @@ def _get_sourcedeb_job_config(
         'import_package_job_name': get_import_package_job_name(
             rosdistro_name, package_format),
         'debian_package_name': get_os_package_name(
-            rosdistro_name, pkg_name),
+            rosdistro_name, pkg_name, dist_file=dist_file),
 
         'notify_emails': notify_emails,
         'maintainer_emails': maintainer_emails,
@@ -696,7 +716,8 @@ def _get_binarydeb_job_config(
         cached_pkgs=None, upstream_job_names=None,
         is_disabled=False,
         docker_base_image_override=None,
-        skip_rosdep_keys=None):
+        skip_rosdep_keys=None,
+        dist_file=None):
     package_format = package_format_mapping[os_name]
     template_name = 'release/%s/binarypkg_job.xml.em' % package_format
 
@@ -759,7 +780,7 @@ def _get_binarydeb_job_config(
         'import_package_job_name': get_import_package_job_name(
             rosdistro_name, package_format),
         'debian_package_name': get_os_package_name(
-            rosdistro_name, pkg_name),
+            rosdistro_name, pkg_name, dist_file=dist_file),
 
         'child_projects': sync_to_testing_job_name,
 
@@ -866,6 +887,10 @@ def _get_sync_packages_to_testing_job_config(
     package_format = package_format_mapping[os_name]
     template_name = 'release/%s/sync_packages_to_testing_job.xml.em' % package_format
 
+    index = get_index(config.rosdistro_index_url)
+    dist_file = get_distribution_file(index, rosdistro_name, build_file)
+    package_prefix = get_os_package_name_prefix(rosdistro_name, dist_file=dist_file)
+
     repository_args, script_generating_key_files = \
         get_repositories_and_script_generating_key_files(config=config)
 
@@ -876,6 +901,7 @@ def _get_sync_packages_to_testing_job_config(
 
         'config_url': config_url,
         'rosdistro_name': rosdistro_name,
+        'package_prefix': package_prefix,
         'release_build_name': release_build_name,
         'os_name': os_name,
         'os_code_name': os_code_name,
@@ -911,7 +937,7 @@ def configure_sync_packages_to_main_job(
     job_name = get_sync_packages_to_main_job_name(
         rosdistro_name, package_format)
     job_config = _get_sync_packages_to_main_job_config(
-        rosdistro_name, build_file, package_format)
+        rosdistro_name, build_file, package_format, config=config)
 
     # jenkinsapi.jenkins.Jenkins evaluates to false if job count is zero
     if isinstance(jenkins, object) and jenkins is not False:
@@ -926,11 +952,20 @@ def get_sync_packages_to_main_job_name(rosdistro_name, package_format):
         view_name, '' if package_format == 'deb' else '-' + package_format)
 
 
-def _get_sync_packages_to_main_job_config(rosdistro_name, build_file, package_format):
+def _get_sync_packages_to_main_job_config(
+        rosdistro_name, build_file, package_format, config=None):
     template_name = 'release/%s/sync_packages_to_main_job.xml.em' % package_format
+
+    package_prefix = None
+    if config:
+        index = get_index(config.rosdistro_index_url)
+        dist_file = get_distribution_file(index, rosdistro_name, build_file)
+        package_prefix = get_os_package_name_prefix(rosdistro_name, dist_file=dist_file)
+
     job_data = {
         'ros_buildfarm_repository': get_repository(),
         'rosdistro_name': rosdistro_name,
+        'package_prefix': package_prefix or ('ros-%s-' % rosdistro_name),
 
         'deb_sync_to_main_job_name': get_sync_packages_to_main_job_name(rosdistro_name, 'deb'),
         'sync_targets': build_file.targets,
@@ -984,7 +1019,8 @@ def partition_packages(
     distribution = get_cached_distribution(index, rosdistro_name, cache=dist_cache)
     pkg_names = filter_buildfile_packages_recursively(all_pkg_names, build_file, distribution)
     for pkg_name in sorted(pkg_names):
-        debian_pkg_name = get_os_package_name(rosdistro_name, pkg_name)
+        debian_pkg_name = get_os_package_name(
+            rosdistro_name, pkg_name, dist_file=dist_file)
         if debian_pkg_name in repo_index:
             binary_packages.add(pkg_name)
 

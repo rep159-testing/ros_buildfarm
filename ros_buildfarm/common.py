@@ -196,50 +196,171 @@ def get_ci_view_name(rosdistro_name):
     return view_name
 
 
-def get_os_package_name_prefix(rosdistro_name):
-    return 'ros-%s-' % rosdistro_name
+def get_os_package_name_prefix(rosdistro_name, dist_file=None):
+    clean_distro = rosdistro_name.replace('_', '-') if rosdistro_name else ''
+    if dist_file and hasattr(dist_file, 'binary_rule') and dist_file.binary_rule:
+        rule = dist_file.binary_rule
+        if isinstance(rule, dict) and rule.get('search') == '^':
+            prefix = rule.get('replace', '').replace('{distro}', clean_distro)
+            return prefix.replace('_', '-')
+    return 'ros-%s-' % clean_distro
 
 
-def get_os_package_name(rosdistro_name, ros_package_name):
+def get_os_package_name(rosdistro_name, ros_package_name, dist_file=None):
+    """
+    Return the OS package name for a ROS package.
+
+    If dist_file is provided, delegates to dist_file.get_binary_package_name()
+    to support declarative binary_rule (regex rewriting, vendor prefixes,
+    exact package overrides). Otherwise falls back to 'ros-<distro>-<pkg>'.
+    """
+    if dist_file and hasattr(dist_file, 'get_binary_package_name'):
+        return dist_file.get_binary_package_name(ros_package_name)
+    clean_distro = rosdistro_name.replace('_', '-') if rosdistro_name else ''
+    clean_pkg = ros_package_name.replace('_', '-')
     return '%s%s' % \
-        (get_os_package_name_prefix(rosdistro_name),
-         ros_package_name.replace('_', '-'))
+        (get_os_package_name_prefix(clean_distro, dist_file=dist_file),
+         clean_pkg)
 
 
+PARENT_RESULT_SPACES_ENV = 'ROS_BUILDFARM_PARENT_RESULT_SPACES'
 BINARY_IMPORT_DISTROS_ENV = 'ROS_BUILDFARM_BINARY_IMPORT_DISTROS'
 
 
 def get_binary_import_distros(dist_file):
-    """
-    Return the distributions a distribution extends with binary_import.
-
-    REP 159: their packages are installed as the parent's own binaries under
-    /opt/ros/<parent>, so a build must source those prefixes as underlays.
-    A distribution file without `extends` (format 2, or a rosdistro library
-    without REP 159 support) has none.
-    """
+    """Return the distributions a distribution extends with binary_import."""
     return [
         ext['distro_name']
         for ext in getattr(dist_file, 'extends', None) or []
-        if ext.get('extension_method') == 'binary_import']
+        if ext.get('extension_method') == 'binary_import'
+    ]
 
 
-def get_default_parent_result_spaces(rosdistro_name, environ=None):
+def get_distribution_install_prefix(dist_file, pkg_name=None):
+    """
+    Return the installation prefix for a distribution or package.
+
+    Uses get_install_prefix() if provided by REP 159 rosdistro dist_file,
+    otherwise falls back to /opt/ros/<distro_name>.
+    """
+    if hasattr(dist_file, 'get_install_prefix'):
+        return dist_file.get_install_prefix(pkg_name)
+    clean_distro = getattr(dist_file, 'name', '').replace('_', '-')
+    return '/opt/ros/%s' % clean_distro if clean_distro else '/usr'
+
+
+def get_binary_import_underlays(dist_file, index=None, _visited=None):
+    """
+    Return the installation prefixes of binary_import parents for dist_file.
+
+    If parent distributions define custom install_rule/prefix in the dist file
+    or within the extends block, those prefixes are resolved. Ancestor underlays
+    are collected recursively in hierarchical order (root ancestors first).
+    """
+    if _visited is None:
+        _visited = set()
+    dist_name = getattr(dist_file, 'name', None)
+    if dist_name and dist_name in _visited:
+        return []
+    if dist_name:
+        _visited.add(dist_name)
+
+    underlays = []
+    extends = getattr(dist_file, 'extends', None) or []
+    for ext in extends:
+        if ext.get('extension_method') == 'binary_import':
+            parent_distro = ext['distro_name']
+
+            # Recursively gather ancestor underlays from parent distributions
+            p_dist_file = None
+            if index and hasattr(index, 'distributions') and parent_distro in index.distributions:
+                from rosdistro import get_distribution_file
+                p_dist_file = get_distribution_file(index, parent_distro)
+                ancestor_underlays = get_binary_import_underlays(
+                    p_dist_file, index=index, _visited=_visited)
+                for anc in ancestor_underlays:
+                    if anc not in underlays:
+                        underlays.append(anc)
+
+            parent_prefix = None
+            if ext.get('install_rule'):
+                rule = ext['install_rule']
+                if isinstance(rule, str):
+                    parent_prefix = rule.replace('{distro}', parent_distro)
+                elif isinstance(rule, dict) and 'search' in rule and 'replace' in rule:
+                    import re
+                    clean_parent = parent_distro.replace('_', '-')
+                    parent_prefix = re.sub(
+                        rule['search'],
+                        rule['replace'].replace('{distro}', clean_parent),
+                        clean_parent)
+            if (
+                not parent_prefix and p_dist_file is not None and
+                hasattr(p_dist_file, 'get_install_prefix')
+            ):
+                parent_prefix = p_dist_file.get_install_prefix()
+            if not parent_prefix:
+                parent_prefix = '/opt/ros/%s' % parent_distro
+            if parent_prefix not in underlays:
+                underlays.append(parent_prefix)
+    return underlays
+
+
+def get_ci_parent_result_spaces(dist_file, index=None):
+    """
+    Return the prefixes a CI job of dist_file sources, in sourcing order.
+
+    REP 159: the install prefixes of the binary_import ancestors come first,
+    then the distribution's own prefix, which holds the packages of this
+    distribution installed as binaries, such as its workspace package.
+    A distribution without binary_import parents gives an empty list: the
+    build containers then keep their default, /opt/ros/<rosdistro_name>.
+    """
+    spaces = get_binary_import_underlays(dist_file, index=index)
+    if spaces:
+        own_prefix = get_distribution_install_prefix(dist_file)
+        if own_prefix not in spaces:
+            spaces.append(own_prefix)
+    return spaces
+
+
+def get_default_parent_result_spaces(rosdistro_name, environ=None, dist_file=None):
     """
     Return the prefixes to source before building for a rosdistro.
 
-    The binary_import parents listed, colon separated, in
-    ROS_BUILDFARM_BINARY_IMPORT_DISTROS come first, then
-    /opt/ros/<rosdistro_name>. The variable is set when the job is
-    generated: the build images have no rosdistro able to read REP 159
-    distribution files at run time.
+    Checks:
+    1. ROS_BUILDFARM_PARENT_RESULT_SPACES env var (colon-separated full paths).
+    2. ROS_BUILDFARM_BINARY_IMPORT_DISTROS env var (legacy colon-separated distro names).
+    3. dist_file binary_import parents and install_rule, if dist_file provided.
+    4. Default fallback: /opt/ros/<rosdistro_name>.
     """
     if environ is None:
         environ = os.environ
-    parents = [
+
+    explicit_spaces = [
+        p for p in environ.get(PARENT_RESULT_SPACES_ENV, '').split(':')
+        if p
+    ]
+    if explicit_spaces:
+        return explicit_spaces
+
+    target_prefix = '/opt/ros/%s' % rosdistro_name
+    if dist_file and hasattr(dist_file, 'get_install_prefix'):
+        target_prefix = dist_file.get_install_prefix()
+
+    legacy_parents = [
         name for name in environ.get(BINARY_IMPORT_DISTROS_ENV, '').split(':')
-        if name]
-    return ['/opt/ros/%s' % name for name in parents + [rosdistro_name]]
+        if name
+    ]
+    if legacy_parents:
+        return ['/opt/ros/%s' % name for name in legacy_parents] + [target_prefix]
+
+    if dist_file:
+        parent_underlays = get_binary_import_underlays(dist_file)
+        if parent_underlays:
+            return parent_underlays + [target_prefix]
+
+    return [target_prefix]
 
 
 def get_devel_view_name(rosdistro_name, source_build_name, pull_request=False):

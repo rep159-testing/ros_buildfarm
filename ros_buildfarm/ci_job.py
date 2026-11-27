@@ -20,6 +20,7 @@ import sys
 from ros_buildfarm.common import BINARY_IMPORT_DISTROS_ENV
 from ros_buildfarm.common import get_binary_import_distros
 from ros_buildfarm.common import get_ci_job_name
+from ros_buildfarm.common import get_ci_parent_result_spaces
 from ros_buildfarm.common import get_ci_view_name
 from ros_buildfarm.common import get_default_node_label
 from ros_buildfarm.common import get_node_label
@@ -27,6 +28,7 @@ from ros_buildfarm.common \
     import get_repositories_and_script_generating_key_files
 from ros_buildfarm.common import get_xunit_publisher_types_and_patterns
 from ros_buildfarm.common import JobValidationError
+from ros_buildfarm.common import PARENT_RESULT_SPACES_ENV
 from ros_buildfarm.common import write_groovy_script_and_configs
 from ros_buildfarm.config import get_ci_build_files
 from ros_buildfarm.config import get_global_ci_build_files
@@ -262,12 +264,18 @@ def _get_ci_job_config(
             .get('distribution_type', 'ros1')
         assert distribution_type in ('ros1', 'ros2')
         # REP 159: packages of binary_import parents are installed under
-        # /opt/ros/<parent>; tell the build containers to source them.
-        binary_import_distros = get_binary_import_distros(
-            get_distribution_file(index, rosdistro_name))
-        if binary_import_distros:
+        # custom prefixes (or /opt/ros/<parent>); tell the build containers
+        # to source them, then the distribution's own prefix.
+        dist_file = get_distribution_file(index, rosdistro_name)
+        parent_result_spaces = get_ci_parent_result_spaces(
+            dist_file, index=index)
+        if parent_result_spaces:
             build_environment_variables.append('%s=%s' % (
-                BINARY_IMPORT_DISTROS_ENV, ':'.join(binary_import_distros)))
+                PARENT_RESULT_SPACES_ENV, ':'.join(parent_result_spaces)))
+            parents = get_binary_import_distros(dist_file)
+            if parents:
+                build_environment_variables.append('%s=%s' % (
+                    BINARY_IMPORT_DISTROS_ENV, ':'.join(parents)))
     else:
         distribution_type = 'global'
     ros_version = 1 if distribution_type == 'ros1' else 2
